@@ -135,18 +135,7 @@ export default function LoginPage() {
         </Button>
       </form>
 
-      {/* Demo Credentials */}
-      <div className="rounded-lg bg-muted/50 p-4 border border-border">
-        <p className="text-sm font-medium text-foreground mb-2">Demo Credentials</p>
-        <div className="space-y-1 text-sm text-muted-foreground">
-          <p>
-            <span className="font-medium">Admin:</span> admin / admin123
-          </p>
-          <p>
-            <span className="font-medium">Teacher:</span> teacher / teacher123
-          </p>
-        </div>
-      </div>
+
 
       {/* Footer */}
       <p className="text-center text-sm text-muted-foreground">

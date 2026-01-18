@@ -1,11 +1,18 @@
 from rest_framework import permissions
 
 
-class IsAdmin(permissions.BasePermission):
-    """Permission class for admin-only access"""
+class IsSuperAdmin(permissions.BasePermission):
+    """Permission class for super-admin only access"""
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.role == 'admin'
+        return request.user and request.user.is_authenticated and request.user.role == 'super_admin'
+
+
+class IsAdmin(permissions.BasePermission):
+    """Permission class for school-level admin access"""
+    
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated and request.user.role in ['super_admin', 'admin']
 
 
 class IsTeacher(permissions.BasePermission):
@@ -54,13 +61,18 @@ class IsActiveTeacher(permissions.BasePermission):
     message = "Only active and verified teachers can access this resource"
 
 
-class IsOwnerOrAdmin(permissions.BasePermission):
-    """Allow owners to access their own data, or admins to access any data"""
-    
     def has_object_permission(self, request, view, obj):
-        # Admin can access anything
-        if request.user.role == 'admin':
+        # Super admin can access anything
+        if request.user.role == 'super_admin':
             return True
+            
+        # Admin can access data within their school
+        if request.user.role == 'admin':
+            if hasattr(obj, 'school'):
+                return obj.school == request.user.school
+            if hasattr(obj, 'user') and hasattr(obj.user, 'school'):
+                return obj.user.school == request.user.school
+            return True # Fallback for non-tenant objects or the user itself
         
         # Check if object has a user field
         if hasattr(obj, 'user'):

@@ -1,5 +1,5 @@
 // User & Auth Types
-export type UserRole = 'admin' | 'teacher' | 'student' | 'parent'
+export type UserRole = 'super_admin' | 'admin' | 'teacher' | 'student' | 'parent'
 
 export interface User {
   id: number
@@ -8,6 +8,7 @@ export interface User {
   first_name: string
   last_name: string
   role: UserRole
+  school?: School | null
   is_active: boolean
   date_joined: string
   last_login?: string
@@ -34,13 +35,19 @@ export interface LoginResponse {
 export interface School {
   id: number
   name: string
+  code: string
   address: string
+  city: string
+  state: string
+  pincode: string
   phone: string
   email: string
   website?: string
   logo?: string
-  verification_code: string
-  academic_year: string
+  school_verification_code: string
+  established_year?: number
+  affiliation?: string
+  status: 'active' | 'inactive'
   created_at: string
 }
 
@@ -82,21 +89,47 @@ export interface SubjectAssignment {
 }
 
 // Teacher Types
-export type TeacherStatus = 'pending' | 'approved' | 'rejected'
+export type TeacherStatus = 'pending' | 'active' | 'inactive' | 'rejected' | 'resigned'
 
 export interface Teacher {
   id: number
-  user: User
+  user: UserProfile
   employee_id: string
   phone: string
   address: string
   qualification: string
   specialization?: string
   joining_date: string
-  is_self_registered: boolean
+  self_registered: boolean
   status: TeacherStatus
   rejection_reason?: string
+  transfer_requested_to?: number
+  transfer_request_date?: string
   created_at: string
+}
+
+export interface UserProfile {
+  id: number
+  username: string
+  email: string
+  first_name: string
+  last_name: string
+  role: string
+  school?: number
+}
+
+export interface TeacherRegistrationData {
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  date_of_birth: string
+  qualification: string
+  specialization?: string
+  address: string
+  password: string
+  password_confirm: string
+  school_verification_code: string
 }
 
 // Student Types

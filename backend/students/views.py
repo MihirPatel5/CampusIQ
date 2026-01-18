@@ -28,7 +28,17 @@ class StudentViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
+        user = self.request.user
         queryset = super().get_queryset()
+        
+        # Super admin sees all students
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's students
+        elif user.school:
+            queryset = queryset.filter(user__school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')

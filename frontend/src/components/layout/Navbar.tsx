@@ -68,9 +68,11 @@ export function Navbar() {
 
           {/* Greeting */}
           <div className="hidden sm:block">
-            <p className="text-sm text-muted-foreground">{getGreeting()},</p>
-            <h2 className="text-lg font-semibold text-foreground">
-              {user?.first_name || 'User'}
+            <p className="text-xs text-muted-foreground">
+              {user?.school?.name || (user?.role === 'super_admin' ? 'System Administrator' : 'Welcome')},
+            </p>
+            <h2 className="text-base font-semibold text-foreground leading-tight">
+              {user?.first_name} {user?.last_name}
             </h2>
           </div>
         </div>

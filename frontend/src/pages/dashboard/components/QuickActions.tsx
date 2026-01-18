@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/stores/authStore'
 import {
   UserPlus,
   ClipboardCheck,
@@ -9,20 +10,40 @@ import {
   FileText,
   Bell,
   Calendar,
+  Building2,
+  Users,
 } from 'lucide-react'
 
-const actions = [
+const allActions = [
+  {
+    label: 'Add School',
+    icon: Building2,
+    path: '/schools',
+    roles: ['super_admin'],
+    color: 'text-primary',
+    bg: 'bg-primary/10 hover:bg-primary/20',
+  },
   {
     label: 'Add Student',
     icon: UserPlus,
     path: '/students/new',
+    roles: ['admin'],
     color: 'text-primary',
     bg: 'bg-primary/10 hover:bg-primary/20',
+  },
+  {
+    label: 'Approve Teachers',
+    icon: Users,
+    path: '/teachers',
+    roles: ['admin'],
+    color: 'text-success',
+    bg: 'bg-success/10 hover:bg-success/20',
   },
   {
     label: 'Mark Attendance',
     icon: ClipboardCheck,
     path: '/attendance',
+    roles: ['admin', 'teacher'],
     color: 'text-success',
     bg: 'bg-success/10 hover:bg-success/20',
   },
@@ -30,6 +51,7 @@ const actions = [
     label: 'Collect Fee',
     icon: CreditCard,
     path: '/fees',
+    roles: ['admin'],
     color: 'text-warning',
     bg: 'bg-warning/10 hover:bg-warning/20',
   },
@@ -37,6 +59,7 @@ const actions = [
     label: 'Add Exam',
     icon: FileText,
     path: '/exams/new',
+    roles: ['admin', 'teacher'],
     color: 'text-destructive',
     bg: 'bg-destructive/10 hover:bg-destructive/20',
   },
@@ -44,6 +67,7 @@ const actions = [
     label: 'Post Notice',
     icon: Bell,
     path: '/notices/new',
+    roles: ['admin', 'super_admin'],
     color: 'text-info',
     bg: 'bg-info/10 hover:bg-info/20',
   },
@@ -51,6 +75,7 @@ const actions = [
     label: 'Schedule',
     icon: Calendar,
     path: '/timetable',
+    roles: ['admin', 'teacher'],
     color: 'text-purple-500',
     bg: 'bg-purple-500/10 hover:bg-purple-500/20',
   },
@@ -58,6 +83,11 @@ const actions = [
 
 export function QuickActions() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+
+  const actions = allActions.filter(action => 
+    !action.roles || (user && action.roles.includes(user.role))
+  )
 
   return (
     <Card className="p-6">

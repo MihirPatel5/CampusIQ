@@ -23,7 +23,17 @@ class ClassViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
+        user = self.request.user
         queryset = super().get_queryset()
+        
+        # Super admin sees all classes
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's classes
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by academic year
         academic_year = self.request.query_params.get('academic_year')
@@ -61,7 +71,17 @@ class SectionViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
+        user = self.request.user
         queryset = super().get_queryset()
+        
+        # Super admin sees all sections
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's sections
+        elif user.school:
+            queryset = queryset.filter(class_obj__school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')
@@ -99,7 +119,17 @@ class SubjectViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
+        user = self.request.user
         queryset = super().get_queryset()
+        
+        # Super admin sees all subjects
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's subjects
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by type
         subject_type = self.request.query_params.get('type')
@@ -138,7 +168,17 @@ class SubjectAssignmentViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
+        user = self.request.user
         queryset = super().get_queryset()
+        
+        # Super admin sees all assignments
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's assignments
+        elif user.school:
+            queryset = queryset.filter(class_obj__school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')

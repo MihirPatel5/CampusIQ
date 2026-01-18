@@ -29,17 +29,21 @@ export const API_ENDPOINTS = {
   // Auth
   LOGIN: '/auth/login/',
   LOGOUT: '/auth/logout/',
-  REFRESH: '/auth/token/refresh/',
+  REFRESH: '/auth/refresh/', // Backend uses /auth/refresh/ per test script
   ME: '/auth/me/',
+  DASHBOARD_STATS: '/dashboard/stats/',
   
   // Teachers
   TEACHERS: '/teachers/',
-  TEACHER_REGISTER: '/teachers/register/',
+  TEACHER_SELF_REGISTER: '/teachers/self-register/',
   TEACHER_APPROVE: (id: number) => `/teachers/${id}/approve/`,
   TEACHER_REJECT: (id: number) => `/teachers/${id}/reject/`,
+  PENDING_TEACHERS: '/teachers/pending/',
   
   // Students
   STUDENTS: '/students/',
+  STUDENT_DETAIL: (id: number) => `/students/${id}/`,
+  STUDENT_PARENTS: (id: number) => `/students/${id}/parents/`,
   
   // Academic
   CLASSES: '/classes/',
@@ -61,6 +65,9 @@ export const API_ENDPOINTS = {
   RESULTS: '/results/',
   
   // School
-  SCHOOL_PROFILE: '/schools/profile/',
+  SCHOOLS: '/schools/',
+  SCHOOL_DETAIL: (id: number) => `/schools/${id}/`,
+  VERIFICATION_CODE: '/school/verification-code/',
+  REGENERATE_CODE: '/school/regenerate-code/',
 } as const
 

@@ -23,49 +23,53 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Building2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-const menuItems = [
-  {
-    title: 'Main',
-    items: [
-      { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    ],
-  },
-  {
-    title: 'Academic',
-    items: [
-      { label: 'Students', icon: Users, path: '/students' },
-      { label: 'Teachers', icon: GraduationCap, path: '/teachers' },
-      { label: 'Classes', icon: Layers, path: '/classes' },
-      { label: 'Subjects', icon: BookOpen, path: '/subjects' },
-    ],
-  },
-  {
-    title: 'Management',
-    items: [
-      { label: 'Attendance', icon: ClipboardCheck, path: '/attendance' },
-      { label: 'Exams', icon: FileText, path: '/exams' },
-      { label: 'Fees', icon: CreditCard, path: '/fees' },
-      { label: 'Timetable', icon: Calendar, path: '/timetable' },
-    ],
-  },
-  {
-    title: 'Others',
-    items: [
-      { label: 'Notices', icon: Bell, path: '/notices' },
-      { label: 'Library', icon: Library, path: '/library' },
-      { label: 'Transport', icon: Bus, path: '/transport' },
-      { label: 'Settings', icon: Settings, path: '/settings' },
-    ],
-  },
-]
 
 export function Sidebar() {
   const location = useLocation()
   const { isCollapsed, toggleCollapse, isMobileOpen, setMobileOpen } = useSidebarStore()
   const user = useAuthStore((state) => state.user)
+
+  const menuItems = [
+    {
+      title: 'Main',
+      items: [
+        { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+        ...(user?.role === 'super_admin' ? [
+          { label: 'Schools', icon: Building2, path: '/schools' }
+        ] : []),
+      ],
+    },
+    {
+      title: 'Academic',
+      items: [
+        { label: 'Students', icon: Users, path: '/students' },
+        { label: 'Teachers', icon: GraduationCap, path: '/teachers' },
+        { label: 'Classes', icon: Layers, path: '/classes' },
+        { label: 'Subjects', icon: BookOpen, path: '/subjects' },
+      ],
+    },
+    {
+      title: 'Management',
+      items: [
+        { label: 'Attendance', icon: ClipboardCheck, path: '/attendance' },
+        { label: 'Exams', icon: FileText, path: '/exams' },
+        { label: 'Fees', icon: CreditCard, path: '/fees' },
+        { label: 'Timetable', icon: Calendar, path: '/timetable' },
+      ],
+    },
+    {
+      title: 'Others',
+      items: [
+        { label: 'Notices', icon: Bell, path: '/notices' },
+        { label: 'Library', icon: Library, path: '/library' },
+        { label: 'Transport', icon: Bus, path: '/transport' },
+        { label: 'Settings', icon: Settings, path: '/settings' },
+      ],
+    },
+  ]
 
   const sidebarContent = (
     <div className="flex flex-col h-full">

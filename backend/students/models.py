@@ -4,7 +4,7 @@ from core.models import AuditModel
 
 class StudentProfile(AuditModel):
     """
-    Extended student information
+    Extended student information with multi-tenant support
     """
     GENDER_CHOICES = [
         ('male', 'Male'),
@@ -19,6 +19,14 @@ class StudentProfile(AuditModel):
         ('transferred', 'Transferred'),
     ]
     
+    school = models.ForeignKey(
+        'accounts.School',
+        on_delete=models.CASCADE,
+        null=True,  # Temporarily nullable for migration
+        blank=True,
+        related_name='students',
+        help_text="School this student belongs to"
+    )
     user = models.OneToOneField(
         'accounts.User',
         on_delete=models.CASCADE,
@@ -26,15 +34,15 @@ class StudentProfile(AuditModel):
         blank=True,
         related_name='student_profile'
     )
-    admission_number = models.CharField(max_length=50, unique=True, help_text="e.g., 'ADM2024001'")
+    admission_number = models.CharField(max_length=50, help_text="e.g., 'ADM2024001'")
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     blood_group = models.CharField(max_length=5, blank=True)
-    aadhaar_number = models.CharField(max_length=12, unique=True, null=True, blank=True)
-    email = models.EmailField(unique=True, null=True, blank=True)
-    phone = models.CharField(max_length=20, unique=True)
+    aadhaar_number = models.CharField(max_length=12, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    phone = models.CharField(max_length=20)
     address = models.TextField()
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
@@ -54,20 +62,34 @@ class StudentProfile(AuditModel):
     previous_class = models.CharField(max_length=50, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     
+    # Transfer tracking
+    transfer_history = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="History of school transfers"
+    )
+    
     class Meta:
         db_table = 'student_profiles'
         verbose_name = 'Student Profile'
         verbose_name_plural = 'Student Profiles'
         indexes = [
+            models.Index(fields=['school']),
             models.Index(fields=['admission_number']),
             models.Index(fields=['class_obj', 'section']),
             models.Index(fields=['email']),
             models.Index(fields=['phone']),
             models.Index(fields=['status']),
         ]
+        # Unique constraints per school
+        unique_together = [
+            ('school', 'admission_number'),
+            ('school', 'email'),
+            ('school', 'phone'),
+        ]
     
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.admission_number})"
+        return f"{self.first_name} {self.last_name} ({self.admission_number}) - {self.school.name}"
     
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}"

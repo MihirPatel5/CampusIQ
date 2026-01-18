@@ -1,12 +1,12 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
-from core.models import AuditModel,  TimeStampedModel
+from core.models import TenantAwareModel,  TimeStampedModel
 from decimal import Decimal
 
 
-class Exam(AuditModel):
+class Exam(TenantAwareModel):
     """
-    Exam definitions
+    Exam definitions - Multi-tenant
     """
     TYPE_CHOICES = [
         ('unit_test', 'Unit Test'),
@@ -34,18 +34,18 @@ class Exam(AuditModel):
         verbose_name = 'Exam'
         verbose_name_plural = 'Exams'
         indexes = [
-            models.Index(fields=['academic_year']),
+            models.Index(fields=['school', 'academic_year']),
             models.Index(fields=['status']),
         ]
         ordering = ['-start_date']
     
     def __str__(self):
-        return f"{self.name} ({self.academic_year})"
+        return f"{self.name} ({self.academic_year}) - {self.school.name}"
 
 
 class ExamResult(TimeStampedModel):
     """
-    Student exam marks
+    Student exam marks - Multi-tenant (inherits from exam's school)
     """
     GRADE_CHOICES = [
         ('A+', 'A+'),
@@ -58,6 +58,14 @@ class ExamResult(TimeStampedModel):
         ('F', 'F'),
     ]
     
+    school = models.ForeignKey(
+        'accounts.School',
+        on_delete=models.CASCADE,
+        null=True,  # Temporarily nullable for migration
+        blank=True,
+        related_name='exam_results',
+        help_text="Auto-populated from exam's school"
+    )
     exam = models.ForeignKey(
         Exam,
         on_delete=models.CASCADE,
@@ -95,16 +103,27 @@ class ExamResult(TimeStampedModel):
         db_table = 'exam_results'
         verbose_name = 'Exam Result'
         verbose_name_plural = 'Exam Results'
-        unique_together = [('exam', 'student', 'subject')]
+        unique_together = [('school', 'exam', 'student', 'subject')]
         indexes = [
-            models.Index(fields=['exam']),
-            models.Index(fields=['student']),
+            models.Index(fields=['school', 'exam']),
+            models.Index(fields=['school', 'student']),
             models.Index(fields=['subject']),
         ]
         ordering = ['-created_at']
     
+    def save(self, *args, **kwargs):
+        # Auto-populate school from exam's school
+        if not self.school_id and self.exam_id:
+            self.school = self.exam.school
+        
+        # Auto-calculate grade if not provided
+        if not self.grade:
+            self.grade = self.calculate_grade()
+        
+        super().save(*args, **kwargs)
+    
     def __str__(self):
-        return f"{self.student.get_full_name()} - {self.subject.name} ({self.exam.name})"
+        return f"{self.student.get_full_name()} - {self.subject.name} ({self.exam.name}) - {self.school.name}"
     
     def get_percentage(self):
         """Calculate percentage"""
@@ -131,9 +150,3 @@ class ExamResult(TimeStampedModel):
             return 'D'
         else:
             return 'F'
-    
-    def save(self, *args, **kwargs):
-        # Auto-calculate grade if not provided
-        if not self.grade:
-            self.grade = self.calculate_grade()
-        super().save(*args, **kwargs)

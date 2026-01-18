@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
-import { formatNumber, formatCurrency } from '@/lib/utils'
+import { formatNumber } from '@/lib/utils'
+import { dashboardService } from '@/services/dashboardService'
 import {
   Users,
   GraduationCap,
@@ -9,6 +11,8 @@ import {
   ClipboardCheck,
   TrendingUp,
   TrendingDown,
+  Building2,
+  Activity,
 } from 'lucide-react'
 
 interface StatCardProps {
@@ -16,17 +20,40 @@ interface StatCardProps {
   value: string | number
   change?: number
   changeLabel?: string
-  icon: React.ReactNode
+  icon: string
   gradient: string
   iconColor: string
   delay?: number
 }
 
+const ICON_MAP: Record<string, React.ReactNode> = {
+  'users': <Users className="h-6 w-6 text-primary" />,
+  'graduation-cap': <GraduationCap className="h-6 w-6 text-success" />,
+  'credit-card': <CreditCard className="h-6 w-6 text-warning" />,
+  'clipboard-check': <ClipboardCheck className="h-6 w-6 text-info" />,
+  'building': <Building2 className="h-6 w-6 text-primary" />,
+  'activity': <Activity className="h-6 w-6 text-success" />,
+}
+
+const GRADIENTS = [
+  'stat-gradient-blue',
+  'stat-gradient-green',
+  'stat-gradient-orange',
+  'stat-gradient-cyan',
+]
+
+const ICON_COLORS = [
+  'bg-primary/10',
+  'bg-success/10',
+  'bg-warning/10',
+  'bg-info/10',
+]
+
 function StatCard({
   title,
   value,
   change,
-  changeLabel,
+  changeLabel = 'from last month',
   icon,
   gradient,
   iconColor,
@@ -45,7 +72,9 @@ function StatCard({
         <div className="flex items-start justify-between">
           <div className="space-y-2">
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-3xl font-bold text-foreground">{value}</p>
+            <p className="text-3xl font-bold text-foreground">
+              {typeof value === 'number' ? formatNumber(value) : value}
+            </p>
             {change !== undefined && (
               <div className="flex items-center gap-1 text-sm">
                 {isPositive && (
@@ -60,9 +89,7 @@ function StatCard({
                     <span className="text-destructive font-medium">{change}%</span>
                   </>
                 )}
-                {changeLabel && (
-                  <span className="text-muted-foreground">{changeLabel}</span>
-                )}
+                <span className="text-muted-foreground">{changeLabel}</span>
               </div>
             )}
           </div>
@@ -72,62 +99,55 @@ function StatCard({
               iconColor
             )}
           >
-            {icon}
+            {ICON_MAP[icon] || <Activity className="h-6 w-6" />}
           </div>
         </div>
 
-        {/* Decorative Element */}
         <div className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full opacity-10 bg-current" />
       </Card>
     </motion.div>
   )
 }
 
-// Mock data - replace with API calls
-const stats = [
-  {
-    title: 'Total Students',
-    value: formatNumber(2547),
-    change: 12,
-    changeLabel: 'from last month',
-    icon: <Users className="h-6 w-6 text-primary" />,
-    gradient: 'stat-gradient-blue',
-    iconColor: 'bg-primary/10',
-  },
-  {
-    title: 'Total Teachers',
-    value: formatNumber(156),
-    change: 3,
-    changeLabel: 'new this month',
-    icon: <GraduationCap className="h-6 w-6 text-success" />,
-    gradient: 'stat-gradient-green',
-    iconColor: 'bg-success/10',
-  },
-  {
-    title: 'Fees Collected',
-    value: formatCurrency(4250000),
-    change: 8,
-    changeLabel: 'from last month',
-    icon: <CreditCard className="h-6 w-6 text-warning" />,
-    gradient: 'stat-gradient-orange',
-    iconColor: 'bg-warning/10',
-  },
-  {
-    title: "Today's Attendance",
-    value: '94.2%',
-    change: -2,
-    changeLabel: 'from yesterday',
-    icon: <ClipboardCheck className="h-6 w-6 text-info" />,
-    gradient: 'stat-gradient-cyan',
-    iconColor: 'bg-info/10',
-  },
-]
-
 export function StatsCards() {
+  const [stats, setStats] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await dashboardService.getStats()
+        setStats(data.stats)
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="h-32 animate-pulse bg-muted/50" />
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
       {stats.map((stat, index) => (
-        <StatCard key={stat.title} {...stat} delay={index * 0.1} />
+        <StatCard 
+          key={stat.title} 
+          {...stat} 
+          delay={index * 0.1} 
+          gradient={GRADIENTS[index % GRADIENTS.length]}
+          iconColor={ICON_COLORS[index % ICON_COLORS.length]}
+        />
       ))}
     </div>
   )

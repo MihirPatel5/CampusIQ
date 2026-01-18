@@ -1,16 +1,19 @@
 from rest_framework import status, generics, viewsets
+from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate
-from .models import User, SchoolProfile, TeacherProfile
+from .models import User, School, TeacherProfile
 from .serializers import (
     UserSerializer, LoginSerializer, TeacherRegistrationSerializer,
-    TeacherProfileSerializer, TeacherCreateSerializer, SchoolProfileSerializer
+    TeacherProfileSerializer, TeacherCreateSerializer, SchoolSerializer
 )
-from .permissions import IsAdmin, IsActiveTeacher
+from .permissions import IsAdmin, IsActiveTeacher, IsSuperAdmin
+from students.models import StudentProfile
+from .models import User, School, TeacherProfile
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -106,7 +109,17 @@ class TeacherViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
+        user = self.request.user
         queryset = super().get_queryset()
+        
+        # Super admin sees all teachers
+        if user.is_super_admin():
+            pass
+        # School admin sees only their school's teachers
+        elif user.is_school_admin():
+            queryset = queryset.filter(user__school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by status
         status_param = self.request.query_params.get('status', None)
@@ -192,83 +205,117 @@ class TeacherViewSet(viewsets.ModelViewSet):
         })
 
 
-class SchoolProfileView(generics.RetrieveUpdateAPIView):
+class SchoolViewSet(viewsets.ModelViewSet):
     """
-    View for SchoolProfile (singleton)
-    GET /api/v1/school/profile/
-    PATCH /api/v1/school/profile/
+    ViewSet for School management (multi-tenant)
+    Super admins can create and delete schools.
+    School admins can update their own school.
     """
-    queryset = SchoolProfile.objects.all()
-    serializer_class = SchoolProfileSerializer
-    
+    queryset = School.objects.all()
+    serializer_class = SchoolSerializer
+
     def get_permissions(self):
-        if self.request.method == 'GET':
-            return [IsAuthenticated()]
-        return [IsAdmin()]
+        if self.action in ['create', 'destroy']:
+            return [IsSuperAdmin()]
+        return [IsAuthenticated()]
     
-    def get_object(self):
-        # Get or create the single school profile
-        obj, created = SchoolProfile.objects.get_or_create(
-            id=1,
-            defaults={'name': 'My School', 'school_verification_code': SchoolProfile.generate_verification_code()}
-        )
-        return obj
+    def get_queryset(self):
+        # Super admin sees all schools
+        if self.request.user.is_super_admin():
+            return School.objects.all()
+        # School admin sees only their school
+        elif self.request.user.school:
+            return School.objects.filter(id=self.request.user.school.id)
+        return School.objects.none()
     
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
 
 @api_view(['GET'])
-@permission_classes([IsAdmin])
+@permission_classes([IsAuthenticated])
 def get_verification_code(request):
     """
-    Get school verification code (admin only)
-    GET /api/v1/school/verification-code/
+    Get the school verification code for user's school
     """
-    try:
-        school = SchoolProfile.objects.first()
-        if not school:
-            return Response(
-                {'error': 'School profile not configured'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        
-        return Response({
-            'school_verification_code': school.school_verification_code
-        })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+    if request.user.is_super_admin():
+        return Response({"error": "Super admin doesn't have a specific school"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not request.user.school:
+        return Response({"error": "User not associated with any school"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    school = request.user.school
+    
+    return Response({
+        'school_verification_code': school.school_verification_code
+    })
 
 
 @api_view(['POST'])
-@permission_classes([IsAdmin])
+@permission_classes([IsAuthenticated])
 def regenerate_verification_code(request):
     """
-    Regenerate school verification code (admin only)
-    POST /api/v1/school/regenerate-code/
+    Regenerate the verification code for user's school (admin only)
     """
-    try:
-        school = SchoolProfile.objects.first()
-        if not school:
-            return Response(
-                {'error': 'School profile not configured'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+    if request.user.role not in ['super_admin', 'admin']:
+        return Response({"error": "Only admins can regenerate verification codes"}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.is_super_admin():
+        return Response({"error": "Super admin must specify school ID"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not request.user.school:
+        return Response({"error": "User not associated with any school"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    school = request.user.school
+    school.school_verification_code = School.generate_verification_code()
+    school.updated_by = request.user
+    school.save()
+    
+    return Response({
+        'message': 'Verification code regenerated successfully',
+        'school_verification_code': school.school_verification_code
+    })
+
+
+class DashboardStatsView(APIView):
+    """
+    API View to provide dashboard statistics based on user role and school
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
         
-        # Generate new code
-        school.school_verification_code = SchoolProfile.generate_verification_code()
-        school.updated_by = request.user
-        school.save()
+        if user.role == 'super_admin':
+            # System-wide stats for super admin
+            total_schools = School.objects.count()
+            total_students = StudentProfile.objects.count()
+            total_teachers = TeacherProfile.objects.count()
+            
+            return Response({
+                'stats': [
+                    {'title': 'Total Schools', 'value': total_schools, 'icon': 'building', 'change': 5},
+                    {'title': 'Total Students', 'value': total_students, 'icon': 'users', 'change': 12},
+                    {'title': 'Total Teachers', 'value': total_teachers, 'icon': 'graduation-cap', 'change': 3},
+                    {'title': 'System Status', 'value': 'Healthy', 'icon': 'activity'},
+                ]
+            })
         
-        return Response({
-            'message': 'Verification code regenerated successfully',
-            'school_verification_code': school.school_verification_code
-        })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        elif user.school:
+            # School-specific stats for admin/teacher
+            school = user.school
+            total_students = StudentProfile.objects.filter(user__school=school).count()
+            total_teachers = User.objects.filter(school=school, role='teacher').count()
+            # Mocking attendance and fees for now until those modules are fully integrated
+            attendance_rate = "94.2%" 
+            
+            return Response({
+                'stats': [
+                    {'title': 'Total Students', 'value': total_students, 'icon': 'users', 'change': 8},
+                    {'title': 'Total Teachers', 'value': total_teachers, 'icon': 'graduation-cap', 'change': 2},
+                    {'title': 'Today Attendance', 'value': attendance_rate, 'icon': 'clipboard-check', 'change': -1},
+                    {'title': 'Active Classes', 'value': 12, 'icon': 'building'},
+                ]
+            })
+        
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)

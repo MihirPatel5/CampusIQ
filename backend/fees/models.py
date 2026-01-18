@@ -1,12 +1,12 @@
 from django.db import models
 from django.core.validators import MinValueValidator
-from core.models import AuditModel, TimeStampedModel
+from core.models import TenantAwareModel, TimeStampedModel
 from decimal import Decimal
 
 
-class FeeStructure(AuditModel):
+class FeeStructure(TenantAwareModel):
     """
-    Fee structure definitions
+    Fee structure definitions - Multi-tenant
     """
     STATUS_CHOICES = [
         ('active', 'Active'),
@@ -21,7 +21,7 @@ class FeeStructure(AuditModel):
         null=True,
         blank=True,
         related_name='fee_structures',
-        help_text="NULL = applicable to all classes"
+        help_text="NULL = applicable to all classes in the school"
     )
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
@@ -31,13 +31,13 @@ class FeeStructure(AuditModel):
         verbose_name = 'Fee Structure'
         verbose_name_plural = 'Fee Structures'
         indexes = [
-            models.Index(fields=['class_obj']),
-            models.Index(fields=['academic_year']),
+            models.Index(fields=['school', 'class_obj']),
+            models.Index(fields=['school', 'academic_year']),
             models.Index(fields=['status']),
         ]
     
     def __str__(self):
-        return self.name
+        return f"{self.name} - {self.school.name}"
 
 
 class FeeItem(TimeStampedModel):
@@ -68,9 +68,9 @@ class FeeItem(TimeStampedModel):
         return f"{self.name} - ₹{self.amount}"
 
 
-class Invoice(AuditModel):
+class Invoice(TenantAwareModel):
     """
-    Fee invoices for students
+    Fee invoices for students - Multi-tenant
     """
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -79,7 +79,7 @@ class Invoice(AuditModel):
         ('overdue', 'Overdue'),
     ]
     
-    invoice_number = models.CharField(max_length=50, unique=True, help_text="e.g., 'INV-2024-001'")
+    invoice_number = models.CharField(max_length=50, help_text="e.g., 'INV-2024-001'")
     student = models.ForeignKey(
         'students.StudentProfile',
         on_delete=models.CASCADE,
@@ -102,15 +102,16 @@ class Invoice(AuditModel):
         verbose_name = 'Invoice'
         verbose_name_plural = 'Invoices'
         indexes = [
-            models.Index(fields=['student']),
-            models.Index(fields=['invoice_number']),
+            models.Index(fields=['school', 'student']),
+            models.Index(fields=['school', 'invoice_number']),
             models.Index(fields=['status']),
             models.Index(fields=['due_date']),
         ]
+        unique_together = [('school', 'invoice_number')]
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.invoice_number} - {self.student.get_full_name()}"
+        return f"{self.invoice_number} - {self.student.get_full_name()} - {self.school.name}"
     
     def update_status(self):
         """Auto-update invoice status based on payment"""

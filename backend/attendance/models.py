@@ -4,7 +4,7 @@ from core.models import TimeStampedModel
 
 class Attendance(TimeStampedModel):
     """
-    Daily attendance records
+    Daily attendance records - Multi-tenant
     """
     STATUS_CHOICES = [
         ('present', 'Present'),
@@ -13,6 +13,14 @@ class Attendance(TimeStampedModel):
         ('leave', 'Leave'),
     ]
     
+    school = models.ForeignKey(
+        'accounts.School',
+        on_delete=models.CASCADE,
+        null=True,  # Temporarily nullable for migration
+        blank=True,
+        related_name='attendance_records',
+        help_text="Auto-populated from student's school"
+    )
     student = models.ForeignKey(
         'students.StudentProfile',
         on_delete=models.CASCADE,
@@ -48,14 +56,20 @@ class Attendance(TimeStampedModel):
         db_table = 'attendance'
         verbose_name = 'Attendance'
         verbose_name_plural = 'Attendance Records'
-        unique_together = [('student', 'date')]
+        unique_together = [('school', 'student', 'date')]
         indexes = [
-            models.Index(fields=['student']),
-            models.Index(fields=['date']),
-            models.Index(fields=['class_obj', 'section']),
-            models.Index(fields=['date', 'class_obj', 'section']),
+            models.Index(fields=['school', 'student']),
+            models.Index(fields=['school', 'date']),
+            models.Index(fields=['school', 'class_obj', 'section']),
+            models.Index(fields=['school', 'date', 'class_obj', 'section']),
         ]
         ordering = ['-date']
     
+    def save(self, *args, **kwargs):
+        """Auto-populate school from student's school"""
+        if not self.school_id and self.student_id:
+            self.school = self.student.school
+        super().save(*args, **kwargs)
+    
     def __str__(self):
-        return f"{self.student.get_full_name()} - {self.date} ({self.get_status_display()})"
+        return f"{self.student.get_full_name()} - {self.date} ({self.get_status_display()}) - {self.school.name}"

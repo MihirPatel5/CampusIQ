@@ -8,9 +8,14 @@ import { LoadingScreen } from './components/ui/loading-screen'
 
 // Lazy load pages for better performance
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const TeacherRegistrationPage = lazy(() => import('./pages/auth/TeacherRegistrationPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'))
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+const SchoolsPage = lazy(() => import('./pages/admin/SchoolsPage'))
+const StudentsPage = lazy(() => import('./pages/students/StudentsPage'))
+const StudentAdmissionPage = lazy(() => import('./pages/students/StudentAdmissionPage'))
+const TeachersPage = lazy(() => import('./pages/teachers/TeachersPage'))
 
 function App() {
   return (
@@ -20,6 +25,7 @@ function App() {
         <Route element={<PublicRoute />}>
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register/teacher" element={<TeacherRegistrationPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           </Route>
         </Route>
@@ -29,9 +35,11 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             
-            {/* Placeholder routes for future modules */}
-            <Route path="/students" element={<ComingSoon title="Students" />} />
-            <Route path="/teachers" element={<ComingSoon title="Teachers" />} />
+            {/* Admin routes */}
+            <Route path="/schools" element={<SchoolsPage />} />
+            <Route path="/students" element={<StudentsPage />} />
+            <Route path="/students/admission" element={<StudentAdmissionPage />} />
+            <Route path="/teachers" element={<TeachersPage />} />
             <Route path="/classes" element={<ComingSoon title="Classes & Sections" />} />
             <Route path="/subjects" element={<ComingSoon title="Subjects" />} />
             <Route path="/attendance" element={<ComingSoon title="Attendance" />} />
