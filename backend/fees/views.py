@@ -23,7 +23,17 @@ class FeeStructureViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = FeeStructure.objects.prefetch_related('fee_items').all()
+        
+        # Super admin sees all fee structures
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's fee structures
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')
@@ -60,21 +70,22 @@ def generate_invoices(request):
     section_id = data.get('section_id')
     
     try:
-        fee_structure = FeeStructure.objects.get(id=fee_structure_id)
+        fee_structure = FeeStructure.objects.get(id=fee_structure_id, school=request.user.school)
     except FeeStructure.DoesNotExist:
-        return Response({'error': 'Fee structure not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Fee structure not found in your school'}, status=status.HTTP_404_NOT_FOUND)
     
-    # Get students list
+    # Get students list (filtered by school)
     if student_ids:
-        students = StudentProfile.objects.filter(id__in=student_ids, status='active')
+        students = StudentProfile.objects.filter(id__in=student_ids, status='active', user__school=request.user.school)
     elif class_id and section_id:
         students = StudentProfile.objects.filter(
             class_obj_id=class_id,
             section_id=section_id,
-            status='active'
+            status='active',
+            user__school=request.user.school
         )
     elif class_id:
-        students = StudentProfile.objects.filter(class_obj_id=class_id, status='active')
+        students = StudentProfile.objects.filter(class_obj_id=class_id, status='active', user__school=request.user.school)
     else:
         return Response(
             {'error': 'Provide either student_ids or class_id/section_id'},
@@ -94,6 +105,7 @@ def generate_invoices(request):
                 invoice_number=invoice_number,
                 student=student,
                 fee_structure=fee_structure,
+                school=request.user.school,  # Set school explicitly
                 total_amount=fee_structure.total_amount,
                 remaining_amount=fee_structure.total_amount,
                 due_date=fee_structure.fee_items.first().due_date if fee_structure.fee_items.exists() else None,
@@ -120,7 +132,17 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = Invoice.objects.select_related('student', 'fee_structure').all()
+        
+        # Super admin sees all invoices
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's invoices
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by student
         student_id = self.request.query_params.get('student_id')
@@ -147,7 +169,17 @@ class PaymentViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = Payment.objects.select_related('invoice', 'invoice__student').all()
+        
+        # Super admin sees all payments
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's payments
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by invoice
         invoice_id = self.request.query_params.get('invoice_id')

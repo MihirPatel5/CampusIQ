@@ -23,7 +23,17 @@ class ExamViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = Exam.objects.all()
+        
+        # Super admin sees all exams
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's exams
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by academic year
         academic_year = self.request.query_params.get('academic_year')
@@ -82,13 +92,15 @@ def enter_results_bulk(request):
         remarks = record.get('remarks', '')
         
         try:
-            student = StudentProfile.objects.get(id=student_id)
+            # Filter student by school
+            student = StudentProfile.objects.get(id=student_id, user__school=request.user.school)
             
             # Create or update result
             result, created = ExamResult.objects.update_or_create(
                 exam_id=exam_id,
                 student=student,
                 subject_id=subject_id,
+                school=request.user.school,  # Set school explicitly
                 defaults={
                     'marks_obtained': marks_obtained,
                     'max_marks': max_marks,
@@ -123,10 +135,10 @@ def student_report_card(request, exam_id, student_id):
     GET /api/v1/exams/{exam_id}/report-card/{student_id}/
     """
     try:
-        exam = Exam.objects.get(id=exam_id)
-        student = StudentProfile.objects.get(id=student_id)
+        exam = Exam.objects.get(id=exam_id, school=request.user.school)
+        student = StudentProfile.objects.get(id=student_id, user__school=request.user.school)
     except (Exam.DoesNotExist, StudentProfile.DoesNotExist) as e:
-        return Response({'error': str(e)}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Exam or Student not found in your school'}, status=status.HTTP_404_NOT_FOUND)
     
     # Get all results for this student in this exam
     results = ExamResult.objects.filter(exam=exam, student=student).select_related('subject')
@@ -188,7 +200,17 @@ class ExamResultViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
     
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = ExamResult.objects.select_related('exam', 'student', 'subject', 'entered_by').all()
+        
+        # Super admin sees all results
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's results
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by exam
         exam_id = self.request.query_params.get('exam_id')

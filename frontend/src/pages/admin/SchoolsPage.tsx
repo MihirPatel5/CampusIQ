@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Building2, MapPin, Phone, Mail, Shield, Loader2, Globe, Calendar, GraduationCap, MoreVertical, Edit, Trash2 } from 'lucide-react'
+import { Plus, Building2, Loader2, MoreVertical, Edit, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -8,7 +8,6 @@ import { schoolService } from '@/services/schoolService'
 import { getErrorMessage } from '@/services/api'
 import type { School } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -22,13 +21,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +49,10 @@ const schoolSchema = z.object({
   established_year: z.preprocess((val) => Number(val), z.number().min(1800).max(new Date().getFullYear())),
   affiliation: z.string().min(2, 'Affiliation (e.g. CBSE) is required'),
   website: z.string().url('Invalid website URL').optional().or(z.literal('')),
+  // Admin fields (optional in schema, handled in logic)
+  admin_username: z.string().min(3, 'Username must be at least 3 characters').optional().or(z.literal('')),
+  admin_email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  admin_password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
 })
 
 type SchoolFormData = z.infer<typeof schoolSchema>
@@ -73,7 +69,6 @@ export default function SchoolsPage() {
     register,
     handleSubmit,
     reset,
-    setValue,
     formState: { errors },
   } = useForm<SchoolFormData>({
     resolver: zodResolver(schoolSchema),
@@ -117,6 +112,9 @@ export default function SchoolsPage() {
         established_year: new Date().getFullYear(),
         affiliation: 'CBSE',
         website: '',
+        admin_username: '',
+        admin_email: '',
+        admin_password: '',
       })
     }
   }, [editingSchool, reset])
@@ -185,7 +183,7 @@ export default function SchoolsPage() {
             Manage all schools in the multi-tenant system
           </p>
         </div>
-        
+
         <Dialog open={isOpen} onOpenChange={(open) => {
           setIsOpen(open)
           if (!open) setEditingSchool(null)
@@ -268,6 +266,34 @@ export default function SchoolsPage() {
                 {errors.website && <p className="text-xs text-destructive">{errors.website.message}</p>}
               </div>
 
+              {!editingSchool && (
+                <div className="space-y-4 pt-4 border-t">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Plus className="h-3 w-3 text-primary" />
+                    </div>
+                    Initial Admin User
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="admin_username">Admin Username</Label>
+                      <Input id="admin_username" placeholder="schooladmin" {...register('admin_username')} />
+                      {errors.admin_username && <p className="text-xs text-destructive">{errors.admin_username.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="admin_email">Admin Email</Label>
+                      <Input id="admin_email" type="email" placeholder="admin@school.com" {...register('admin_email')} />
+                      {errors.admin_email && <p className="text-xs text-destructive">{errors.admin_email.message}</p>}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="admin_password">Admin Password</Label>
+                    <Input id="admin_password" type="password" placeholder="••••••••" {...register('admin_password')} />
+                    {errors.admin_password && <p className="text-xs text-destructive">{errors.admin_password.message}</p>}
+                  </div>
+                </div>
+              )}
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={isCreating}>
                   Cancel
@@ -342,8 +368,8 @@ export default function SchoolsPage() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge 
-                        variant={school.status === 'active' ? 'outline' : 'secondary'} 
+                      <Badge
+                        variant={school.status === 'active' ? 'outline' : 'secondary'}
                         className={school.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' : ''}
                       >
                         {school.status}

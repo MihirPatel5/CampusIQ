@@ -1,8 +1,8 @@
 from django.db import models
-from core.models import AuditModel
+from core.models import TenantAwareModel
 
 
-class StudentProfile(AuditModel):
+class StudentProfile(TenantAwareModel):
     """
     Extended student information with multi-tenant support
     """
@@ -19,14 +19,6 @@ class StudentProfile(AuditModel):
         ('transferred', 'Transferred'),
     ]
     
-    school = models.ForeignKey(
-        'accounts.School',
-        on_delete=models.CASCADE,
-        null=True,  # Temporarily nullable for migration
-        blank=True,
-        related_name='students',
-        help_text="School this student belongs to"
-    )
     user = models.OneToOneField(
         'accounts.User',
         on_delete=models.CASCADE,
@@ -95,7 +87,7 @@ class StudentProfile(AuditModel):
         return f"{self.first_name} {self.last_name}"
 
 
-class ParentProfile(models.Model):
+class ParentProfile(TenantAwareModel):
     """
     Parent/Guardian information
     """
@@ -105,6 +97,13 @@ class ParentProfile(models.Model):
         ('guardian', 'Guardian'),
     ]
     
+    user = models.OneToOneField(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='parent_profile'
+    )
     student = models.ForeignKey(
         StudentProfile,
         on_delete=models.CASCADE,
@@ -117,8 +116,6 @@ class ParentProfile(models.Model):
     occupation = models.CharField(max_length=100, blank=True)
     address = models.TextField(blank=True)
     is_primary = models.BooleanField(default=False, help_text="Primary contact for communications")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
         db_table = 'parent_profiles'

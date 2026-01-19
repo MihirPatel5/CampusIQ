@@ -8,7 +8,7 @@ export const ROUTES = {
   // Auth
   LOGIN: '/login',
   FORGOT_PASSWORD: '/forgot-password',
-  
+
   // Main
   DASHBOARD: '/dashboard',
   STUDENTS: '/students',
@@ -32,38 +32,43 @@ export const API_ENDPOINTS = {
   REFRESH: '/auth/refresh/', // Backend uses /auth/refresh/ per test script
   ME: '/auth/me/',
   DASHBOARD_STATS: '/dashboard/stats/',
-  
+
   // Teachers
   TEACHERS: '/teachers/',
   TEACHER_SELF_REGISTER: '/teachers/self-register/',
   TEACHER_APPROVE: (id: number) => `/teachers/${id}/approve/`,
   TEACHER_REJECT: (id: number) => `/teachers/${id}/reject/`,
   PENDING_TEACHERS: '/teachers/pending/',
-  
+
   // Students
   STUDENTS: '/students/',
   STUDENT_DETAIL: (id: number) => `/students/${id}/`,
   STUDENT_PARENTS: (id: number) => `/students/${id}/parents/`,
-  
+
   // Academic
   CLASSES: '/classes/',
   SECTIONS: '/sections/',
   SUBJECTS: '/subjects/',
-  SUBJECT_ASSIGNMENTS: '/subject-assignments/',
-  
+  SUBJECT_ASSIGNMENTS: '/assignments/',
+
   // Attendance
   ATTENDANCE: '/attendance/',
+  ATTENDANCE_MARK: '/attendance/mark/',
+  ATTENDANCE_STUDENTS: '/attendance/students/',
+  STUDENT_ATTENDANCE_HISTORY: (id: number) => `/attendance/student/${id}/`,
   ATTENDANCE_STATS: '/attendance/statistics/',
-  
+
   // Fees
-  FEE_STRUCTURES: '/fee-structures/',
-  INVOICES: '/invoices/',
-  PAYMENTS: '/payments/',
-  
+  FEE_STRUCTURES: '/fees/structures/',
+  INVOICES: '/fees/invoices/',
+  PAYMENTS: '/fees/payments/',
+
   // Exams
   EXAMS: '/exams/',
-  RESULTS: '/results/',
-  
+  EXAM_RESULTS: '/exams/results/',
+  BULK_RESULT_ENTRY: '/exams/results/bulk-entry/',
+  STUDENT_REPORT_CARD: (examId: number, studentId: number) => `/exams/${examId}/report-card/${studentId}/`,
+
   // School
   SCHOOLS: '/schools/',
   SCHOOL_DETAIL: (id: number) => `/schools/${id}/`,

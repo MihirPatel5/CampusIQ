@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  User, 
-  Mail, 
-  Phone, 
+import {
+  Plus,
+  Search,
+  User,
+  Phone,
   GraduationCap,
   MoreVertical,
   Edit,
   Trash2,
-  Eye,
-  Loader2
+  Eye
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { studentService } from '@/services/studentService'
@@ -77,9 +74,9 @@ export default function StudentsPage() {
       if (filters.search) params.search = filters.search
       if (filters.class_id && filters.class_id !== 'all') params.class_id = filters.class_id
       if (filters.section_id && filters.section_id !== 'all') params.section_id = filters.section_id
-      
+
       const response = await studentService.getStudents(params)
-      setStudents(response.results)
+      setStudents(response)
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -143,8 +140,8 @@ export default function StudentsPage() {
               </SelectContent>
             </Select>
 
-            <Select 
-              value={filters.section_id} 
+            <Select
+              value={filters.section_id}
               onValueChange={(val) => setFilters(prev => ({ ...prev, section_id: val }))}
               disabled={!filters.class_id || filters.class_id === 'all'}
             >
@@ -207,17 +204,17 @@ export default function StudentsPage() {
                           </div>
                           <div>
                             <p className="font-medium text-foreground">
-                              {student.first_name} {student.last_name}
+                              {student.first_name || 'Unknown'} {student.last_name || ''}
                             </p>
-                            <p className="text-xs text-muted-foreground">{student.email || 'No email'}</p>
+                            <p className="text-xs text-muted-foreground">{student.email || student.phone || 'No contact info'}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 font-mono text-xs">{student.admission_number}</td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
-                          <span>{student.class_name}</span>
-                          <span className="text-xs text-muted-foreground">{student.section_name}</span>
+                          <span>{student.class_name || 'N/A'}</span>
+                          <span className="text-xs text-muted-foreground">{student.section_name || 'N/A'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">

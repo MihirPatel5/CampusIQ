@@ -4,18 +4,11 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { 
-  ArrowLeft, 
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Loader2, 
-  Plus, 
-  Trash2,
-  Calendar,
-  CreditCard,
-  Building2
+import {
+  ArrowLeft,
+  Plus,
+  Loader2,
+  Trash2
 } from 'lucide-react'
 import { studentService } from '@/services/studentService'
 import { academicService } from '@/services/academicService'
@@ -152,20 +145,20 @@ export default function StudentAdmissionPage() {
       <form onSubmit={handleSubmit(onSubmit)}>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-background border-b rounded-none w-full justify-start h-auto p-0 gap-6">
-            <TabsTrigger 
-              value="personal" 
+            <TabsTrigger
+              value="personal"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 py-4 h-auto font-semibold"
             >
               Personal Details
             </TabsTrigger>
-            <TabsTrigger 
-              value="academic" 
+            <TabsTrigger
+              value="academic"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 py-4 h-auto font-semibold"
             >
               Academic Info
             </TabsTrigger>
-            <TabsTrigger 
-              value="parents" 
+            <TabsTrigger
+              value="parents"
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-2 py-4 h-auto font-semibold"
             >
               Parent Details
@@ -283,8 +276,8 @@ export default function StudentAdmissionPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Section</Label>
-                  <Select 
-                    onValueChange={(val) => setValue('section', val)} 
+                  <Select
+                    onValueChange={(val) => setValue('section', val)}
                     disabled={!selectedClass}
                   >
                     <SelectTrigger>
@@ -374,8 +367,8 @@ export default function StudentAdmissionPage() {
                         <Input placeholder="Business / Salaried" {...register(`parents.${index}.occupation`)} />
                       </div>
                       <div className="lg:col-span-3 flex items-center gap-2">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           id={`primary-${index}`}
                           {...register(`parents.${index}.is_primary`)}
                           className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"

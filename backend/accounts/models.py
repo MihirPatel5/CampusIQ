@@ -1,7 +1,16 @@
 import uuid
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager as DjangoUserManager
 from django.db import models
 from core.models import AuditModel, TimeStampedModel
+
+
+class UserManager(DjangoUserManager):
+    """
+    Custom manager for User model to handle role assignment for superusers
+    """
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields.setdefault('role', 'super_admin')
+        return super().create_superuser(username, email, password, **extra_fields)
 
 
 class User(AbstractUser):
@@ -25,6 +34,8 @@ class User(AbstractUser):
         related_name='users',
         help_text="School this user belongs to. NULL for super admins."
     )
+    
+    objects = UserManager()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(

@@ -32,6 +32,14 @@ export interface LoginResponse {
 }
 
 // School Types
+export interface PublicSchool {
+  id: number
+  name: string
+  logo: string | null
+  city: string
+  state: string
+}
+
 export interface School {
   id: number
   name: string
@@ -48,44 +56,59 @@ export interface School {
   established_year?: number
   affiliation?: string
   status: 'active' | 'inactive'
-  created_at: string
+  created_at?: string
+  updated_at?: string
 }
 
 // Academic Types
 export interface Class {
   id: number
   name: string
-  numeric_name: number
+  code: string
+  academic_year: string
   description?: string
-  is_active: boolean
+  status: 'active' | 'inactive'
   created_at: string
 }
 
 export interface Section {
   id: number
-  name: string
-  class_id: number
+  class_obj: number
   class_name: string
-  capacity: number
+  name: string
+  code: string
+  capacity?: number
+  room_number?: string
   current_strength: number
-  is_active: boolean
+  has_capacity: boolean
+  status: 'active' | 'inactive'
+  created_at: string
 }
 
 export interface Subject {
   id: number
   name: string
   code: string
+  type: 'core' | 'elective' | 'optional'
   description?: string
-  is_active: boolean
+  max_marks: number
+  status: 'active' | 'inactive'
+  created_at: string
 }
 
 export interface SubjectAssignment {
   id: number
-  subject: Subject
-  teacher: Teacher
-  class_obj: Class
-  section: Section
+  class_obj: number
+  class_name: string
+  section: number
+  section_name: string
+  subject: number
+  subject_name: string
+  teacher: number
+  teacher_name: string
   academic_year: string
+  status: 'active' | 'inactive'
+  created_at: string
 }
 
 // Teacher Types
@@ -129,6 +152,7 @@ export interface TeacherRegistrationData {
   address: string
   password: string
   password_confirm: string
+  school_id: number
   school_verification_code: string
 }
 
@@ -147,19 +171,25 @@ export interface Parent {
 
 export interface Student {
   id: number
-  user: User
+  user?: User
+  first_name: string
+  last_name: string
+  full_name: string
   admission_number: string
-  class_obj: Class
-  section: Section
+  class_obj: number
+  class_name: string
+  section: number
+  section_name: string
   roll_number?: string
   date_of_birth: string
   gender: 'male' | 'female' | 'other'
   blood_group?: string
-  address: string
+  email?: string
   phone?: string
+  address: string
   admission_date: string
   status: StudentStatus
-  parents: Parent[]
+  parents?: Parent[]
   photo?: string
   created_at: string
 }
@@ -194,48 +224,61 @@ export interface FeeItem {
   id: number
   name: string
   amount: number
+  due_date: string
+  installment?: number
 }
 
 export interface FeeStructure {
   id: number
   name: string
-  class_obj: Class
-  items: FeeItem[]
-  total_amount: number
   academic_year: string
-  is_active: boolean
+  class_obj: number
+  class_name: string
+  total_amount: number
+  status: 'active' | 'inactive'
+  fee_items: FeeItem[]
+  created_at: string
 }
 
 export interface Invoice {
   id: number
   invoice_number: string
-  student: Student
-  fee_structure: FeeStructure
-  amount: number
+  student: number
+  student_name: string
+  fee_structure: number
+  fee_structure_name: string
+  total_amount: number
   paid_amount: number
+  remaining_amount: number
   due_date: string
   status: PaymentStatus
+  installment?: number
   created_at: string
 }
 
 export interface Payment {
   id: number
-  invoice: Invoice
+  invoice: number
+  invoice_number: string
+  student_name: string
+  receipt_number: string
   amount: number
-  payment_mode: PaymentMode
-  transaction_id?: string
   payment_date: string
-  received_by: User
+  payment_mode: PaymentMode
+  transaction_reference?: string
   remarks?: string
+  created_at: string
 }
 
 // Exam Types
-export type ExamStatus = 'upcoming' | 'ongoing' | 'completed' | 'published'
+export type ExamStatus = 'draft' | 'active' | 'completed' | 'published'
 
 export interface Exam {
   id: number
   name: string
-  class_obj: Class
+  exam_type: string
+  academic_year: string
+  class_obj: number
   start_date: string
   end_date: string
   status: ExamStatus

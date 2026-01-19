@@ -9,7 +9,8 @@ from django.contrib.auth import authenticate
 from .models import User, School, TeacherProfile
 from .serializers import (
     UserSerializer, LoginSerializer, TeacherRegistrationSerializer,
-    TeacherProfileSerializer, TeacherCreateSerializer, SchoolSerializer
+    TeacherProfileSerializer, TeacherCreateSerializer, SchoolSerializer,
+    PublicSchoolSerializer
 )
 from .permissions import IsAdmin, IsActiveTeacher, IsSuperAdmin
 from students.models import StudentProfile
@@ -88,6 +89,33 @@ def teacher_self_register(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_me(request):
+    """
+    Get current user profile
+    GET /api/v1/auth/me/
+    """
+    serializer = UserSerializer(request.user)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout(request):
+    """
+    Logout user (optional: blacklist token)
+    POST /api/v1/auth/logout/
+    """
+    try:
+        refresh_token = request.data.get("refresh")
+        token = RefreshToken(refresh_token)
+        token.blacklist()
+        return Response({"message": "Successfully logged out"}, status=status.HTTP_200_OK)
+    except Exception:
+        return Response({"message": "Token is invalid or expired"}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class TeacherViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Teacher management
@@ -110,7 +138,7 @@ class TeacherViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset()
+        queryset = TeacherProfile.objects.select_related('user').all()
         
         # Super admin sees all teachers
         if user.is_super_admin():
@@ -232,6 +260,16 @@ class SchoolViewSet(viewsets.ModelViewSet):
         serializer.save(updated_by=self.request.user)
 
 
+class PublicSchoolListView(generics.ListAPIView):
+    """
+    API endpoint for public school listing
+    GET /api/v1/schools/public/
+    """
+    queryset = School.objects.filter(status='active').order_by('name')
+    serializer_class = PublicSchoolSerializer
+    permission_classes = [AllowAny]
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_verification_code(request):
@@ -286,7 +324,7 @@ class DashboardStatsView(APIView):
     def get(self, request):
         user = request.user
         
-        if user.role == 'super_admin':
+        if user.role == 'super_admin' or user.is_superuser:
             # System-wide stats for super admin
             total_schools = School.objects.count()
             total_students = StudentProfile.objects.count()

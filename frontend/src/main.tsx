@@ -7,6 +7,10 @@ import { ThemeProvider } from './providers/ThemeProvider'
 import { Toaster } from './components/ui/sonner'
 import './styles/globals.css'
 
+console.log("DEBUG: main.tsx starting");
+
+import { AuthProvider } from './providers/AuthProvider'
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -22,7 +26,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <ThemeProvider defaultTheme="system" storageKey="school-erp-theme">
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
           <Toaster position="top-right" richColors closeButton />
         </ThemeProvider>
       </BrowserRouter>

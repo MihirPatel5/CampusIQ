@@ -1,8 +1,8 @@
 from django.db import models
-from core.models import TimeStampedModel
+from core.models import TenantAwareModel
 
 
-class Attendance(TimeStampedModel):
+class Attendance(TenantAwareModel):
     """
     Daily attendance records - Multi-tenant
     """
@@ -13,14 +13,6 @@ class Attendance(TimeStampedModel):
         ('leave', 'Leave'),
     ]
     
-    school = models.ForeignKey(
-        'accounts.School',
-        on_delete=models.CASCADE,
-        null=True,  # Temporarily nullable for migration
-        blank=True,
-        related_name='attendance_records',
-        help_text="Auto-populated from student's school"
-    )
     student = models.ForeignKey(
         'students.StudentProfile',
         on_delete=models.CASCADE,

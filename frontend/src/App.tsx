@@ -16,6 +16,11 @@ const SchoolsPage = lazy(() => import('./pages/admin/SchoolsPage'))
 const StudentsPage = lazy(() => import('./pages/students/StudentsPage'))
 const StudentAdmissionPage = lazy(() => import('./pages/students/StudentAdmissionPage'))
 const TeachersPage = lazy(() => import('./pages/teachers/TeachersPage'))
+const ClassesPage = lazy(() => import('./pages/academic/ClassesPage'))
+const SubjectsPage = lazy(() => import('./pages/academic/SubjectsPage'))
+const AttendancePage = lazy(() => import('./pages/attendance/AttendancePage'))
+const ExamsPage = lazy(() => import('./pages/exams/ExamsPage'))
+const FeesPage = lazy(() => import('./pages/fees/FeesPage'))
 
 function App() {
   return (
@@ -34,17 +39,26 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
-            
+
             {/* Admin routes */}
-            <Route path="/schools" element={<SchoolsPage />} />
+            <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
+              <Route path="/schools" element={<SchoolsPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={['admin', 'super_admin']} />}>
+              <Route path="/teachers" element={<TeachersPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={['admin', 'super_admin']} />}>
+              <Route path="/fees" element={<FeesPage />} />
+            </Route>
+
             <Route path="/students" element={<StudentsPage />} />
             <Route path="/students/admission" element={<StudentAdmissionPage />} />
-            <Route path="/teachers" element={<TeachersPage />} />
-            <Route path="/classes" element={<ComingSoon title="Classes & Sections" />} />
-            <Route path="/subjects" element={<ComingSoon title="Subjects" />} />
-            <Route path="/attendance" element={<ComingSoon title="Attendance" />} />
-            <Route path="/exams" element={<ComingSoon title="Exams & Results" />} />
-            <Route path="/fees" element={<ComingSoon title="Fees & Payments" />} />
+            <Route path="/classes" element={<ClassesPage />} />
+            <Route path="/subjects" element={<SubjectsPage />} />
+            <Route path="/attendance" element={<AttendancePage />} />
+            <Route path="/exams" element={<ExamsPage />} />
             <Route path="/timetable" element={<ComingSoon title="Timetable" />} />
             <Route path="/notices" element={<ComingSoon title="Notices" />} />
             <Route path="/library" element={<ComingSoon title="Library" />} />

@@ -1,11 +1,11 @@
 import api from './api'
 import { API_ENDPOINTS } from '@/config'
-import type { Student, PaginatedResponse } from '@/types'
+import type { Student } from '@/types'
 
 export const studentService = {
-  async getStudents(params?: any): Promise<PaginatedResponse<Student>> {
-    const response = await api.get<PaginatedResponse<Student>>(API_ENDPOINTS.STUDENTS, { params })
-    return response.data
+  async getStudents(params?: any): Promise<Student[]> {
+    const response = await api.get<any>(API_ENDPOINTS.STUDENTS, { params })
+    return Array.isArray(response.data) ? response.data : (response.data.results || [])
   },
 
   async getStudent(id: number): Promise<Student> {

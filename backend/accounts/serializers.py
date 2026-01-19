@@ -25,7 +25,14 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
     """Serializer for teacher self-registration"""
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True, required=True)
-    school_verification_code = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    school_id = serializers.PrimaryKeyRelatedField(
+        queryset=School.objects.filter(status='active'),
+        source='school',
+        write_only=True,
+        required=True,
+        help_text="The school the teacher is registering for"
+    )
+    school_verification_code = serializers.CharField(write_only=True, required=True)
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
     email = serializers.EmailField(required=True)
@@ -35,7 +42,7 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'date_of_birth',
             'qualification', 'specialization', 'address',
-            'password', 'password_confirm', 'school_verification_code'
+            'password', 'password_confirm', 'school_id', 'school_verification_code'
         ]
     
     def validate(self, attrs):
@@ -43,40 +50,22 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError({"password": "Passwords don't match"})
         
-        # Verify school verification code if provided
+        # Verify school verification code
+        school = attrs.get('school')
         verification_code = attrs.get('school_verification_code')
-        school = None
         
-        if verification_code:
-            try:
-                school = School.objects.get(school_verification_code=verification_code)
-            except School.DoesNotExist:
-                raise serializers.ValidationError({"school_verification_code": "Invalid school verification code"})
-            except School.MultipleObjectsReturned:
-                raise serializers.ValidationError({"school_verification_code": "System error: duplicate verification codes"})
+        if school.school_verification_code != verification_code:
+            raise serializers.ValidationError({"school_verification_code": "Invalid verification code for the selected school"})
         
-        # Store school for later use in create()
-        attrs['_school'] = school
-        
-        # Check email/phone uniqueness
-        # If school is present, check per school. If no school, check globally for users with no school.
+        # Check email/phone uniqueness within the school
         email = attrs['email']
         phone = attrs['phone']
         
-        if school:
-            if User.objects.filter(email=email, school=school).exists():
-                raise serializers.ValidationError({"email": "Email already registered in this school"})
-            if TeacherProfile.objects.filter(phone=phone, user__school=school).exists():
-                raise serializers.ValidationError({"phone": "Phone number already registered in this school"})
-        else:
-            # Global uniqueness check for unassigned users
-            if User.objects.filter(email=email, school__isnull=True).exists():
-                raise serializers.ValidationError({"email": "Email already registered for an unassigned teacher"})
-            # Also check if it exists in ANY school? Usually emails should be globally unique if they are for the same user.
-            # But in multi-tenant, sometimes they are unique per school.
-            # To be safe, let's just check globally if it exists at all.
-            if User.objects.filter(email=email).exists():
-                raise serializers.ValidationError({"email": "This email is already in use"})
+        if User.objects.filter(email=email, school=school).exists():
+            raise serializers.ValidationError({"email": "Email already registered in this school"})
+        
+        if TeacherProfile.objects.filter(phone=phone, user__school=school).exists():
+            raise serializers.ValidationError({"phone": "Phone number already registered in this school"})
         
         return attrs
     
@@ -84,8 +73,8 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
         # Remove non-model fields
         password = validated_data.pop('password')
         validated_data.pop('password_confirm')
-        validated_data.pop('school_verification_code', None)
-        school = validated_data.pop('_school')  # Get the school we found in validate()
+        school = validated_data.pop('school')
+        validated_data.pop('school_verification_code')
         first_name = validated_data.pop('first_name')
         last_name = validated_data.pop('last_name')
         email = validated_data.pop('email')
@@ -99,7 +88,7 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
             first_name=first_name,
             last_name=last_name,
             role='teacher',
-            school=school,  # Assign to the school (can be None)
+            school=school,
             is_active=False  # Inactive until approved
         )
         
@@ -207,6 +196,9 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
 
 class SchoolSerializer(serializers.ModelSerializer):
     """Serializer for School (multi-tenant)"""
+    admin_email = serializers.EmailField(write_only=True, required=False)
+    admin_username = serializers.CharField(write_only=True, required=False)
+    admin_password = serializers.CharField(write_only=True, required=False)
     
     class Meta:
         model = School
@@ -214,6 +206,35 @@ class SchoolSerializer(serializers.ModelSerializer):
             'id', 'name', 'code', 'logo', 'school_verification_code', 'address',
             'city', 'state', 'pincode', 'phone', 'email', 'website', 
             'established_year', 'affiliation', 'status',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at',
+            'admin_email', 'admin_username', 'admin_password'
         ]
         read_only_fields = ['id', 'code', 'school_verification_code', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        admin_email = validated_data.pop('admin_email', None)
+        admin_username = validated_data.pop('admin_username', None)
+        admin_password = validated_data.pop('admin_password', None)
+        
+        school = super().create(validated_data)
+        
+        # Create school admin if details provided
+        if admin_email and admin_username and admin_password:
+            User.objects.create_user(
+                username=admin_username,
+                email=admin_email,
+                password=admin_password,
+                role='admin',
+                school=school,
+                is_active=True
+            )
+            
+        return school
+
+
+class PublicSchoolSerializer(serializers.ModelSerializer):
+    """Serializer for public school listing (limited fields)"""
+    
+    class Meta:
+        model = School
+        fields = ['id', 'name', 'logo', 'city', 'state']

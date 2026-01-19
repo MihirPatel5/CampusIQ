@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     CustomTokenObtainPairView, teacher_self_register, TeacherViewSet,
     SchoolViewSet, get_verification_code, regenerate_verification_code,
-    DashboardStatsView
+    DashboardStatsView, PublicSchoolListView, get_me, logout
 )
 
 router = DefaultRouter()
@@ -14,12 +14,15 @@ urlpatterns = [
     # JWT authentication
     path('auth/login/', CustomTokenObtainPairView.as_view(), name='login'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
+    path('auth/me/', get_me, name='get-me'),
+    path('auth/logout/', logout, name='logout'),
     
     # Teacher self-registration
     path('teachers/self-register/', teacher_self_register, name='teacher-self-register'),
     
     # School profile
     # School management
+    path('schools/public/', PublicSchoolListView.as_view(), name='public-school-list'),
     path('schools/', SchoolViewSet.as_view({'get': 'list', 'post': 'create'}), name='school-list'),
     path('schools/<int:pk>/', SchoolViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update', 'delete': 'destroy'}), name='school-detail'),
     path('school/verification-code/', get_verification_code, name='get-verification-code'),

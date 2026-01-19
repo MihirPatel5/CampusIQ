@@ -46,7 +46,9 @@ export function Sidebar() {
       title: 'Academic',
       items: [
         { label: 'Students', icon: Users, path: '/students' },
-        { label: 'Teachers', icon: GraduationCap, path: '/teachers' },
+        ...(['admin', 'super_admin'].includes(user?.role || '') ? [
+          { label: 'Teachers', icon: GraduationCap, path: '/teachers' }
+        ] : []),
         { label: 'Classes', icon: Layers, path: '/classes' },
         { label: 'Subjects', icon: BookOpen, path: '/subjects' },
       ],
@@ -56,7 +58,9 @@ export function Sidebar() {
       items: [
         { label: 'Attendance', icon: ClipboardCheck, path: '/attendance' },
         { label: 'Exams', icon: FileText, path: '/exams' },
-        { label: 'Fees', icon: CreditCard, path: '/fees' },
+        ...(['admin', 'super_admin'].includes(user?.role || '') ? [
+          { label: 'Fees', icon: CreditCard, path: '/fees' }
+        ] : []),
         { label: 'Timetable', icon: Calendar, path: '/timetable' },
       ],
     },
@@ -92,7 +96,7 @@ export function Sidebar() {
             )}
           </AnimatePresence>
         </Link>
-        
+
         {/* Mobile close button */}
         <button
           onClick={() => setMobileOpen(false)}
@@ -119,12 +123,12 @@ export function Sidebar() {
                   </motion.h3>
                 )}
               </AnimatePresence>
-              
+
               <ul className="space-y-1">
                 {section.items.map((item) => {
                   const isActive = location.pathname === item.path
                   const Icon = item.icon
-                  
+
                   const linkContent = (
                     <Link
                       to={item.path}
@@ -170,7 +174,7 @@ export function Sidebar() {
                   )
                 })}
               </ul>
-              
+
               {sectionIndex < menuItems.length - 1 && !isCollapsed && (
                 <Separator className="mt-4 bg-sidebar-border" />
               )}

@@ -1,3 +1,4 @@
+from core.views import TenantMixin
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -7,7 +8,7 @@ from .models import StudentProfile, ParentProfile
 from .serializers import StudentProfileSerializer, StudentAdmissionSerializer, ParentProfileSerializer
 
 
-class StudentViewSet(viewsets.ModelViewSet):
+class StudentViewSet(TenantMixin, viewsets.ModelViewSet):
     """
     ViewSet for Student management
     """
@@ -29,16 +30,9 @@ class StudentViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset()
+        queryset = StudentProfile.objects.select_related('user', 'class_obj', 'section').prefetch_related('parents').all()
         
-        # Super admin sees all students
-        if user.is_super_admin():
-            pass
-        # School admin/Teacher/Parent sees only their school's students
-        elif user.school:
-            queryset = queryset.filter(user__school=user.school)
-        else:
-            queryset = queryset.none()
+        # Note: TenantManager handles school filtering automatically
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')

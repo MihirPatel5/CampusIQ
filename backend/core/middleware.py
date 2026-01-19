@@ -29,6 +29,7 @@ class TenantMiddleware:
         TenantContext.clear_tenant()
         
         # Set tenant from authenticated user
+        print(f"DEBUG: TenantMiddleware - User: {request.user}, Authenticated: {request.user.is_authenticated}")
         if request.user and request.user.is_authenticated:
             # Check if super admin
             if hasattr(request.user, 'is_super_admin') and request.user.is_super_admin():

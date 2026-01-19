@@ -1,6 +1,6 @@
 import api from './api'
 import { API_ENDPOINTS } from '@/config'
-import type { Teacher, TeacherRegistrationData, PaginatedResponse } from '@/types'
+import type { Teacher, TeacherRegistrationData } from '@/types'
 
 export const teacherService = {
   async registerTeacher(data: TeacherRegistrationData): Promise<{ message: string; teacher: Teacher }> {
@@ -8,14 +8,14 @@ export const teacherService = {
     return response.data
   },
 
-  async getTeachers(params?: any): Promise<PaginatedResponse<Teacher> | Teacher[]> {
-    const response = await api.get(API_ENDPOINTS.TEACHERS, { params })
-    return response.data
+  async getTeachers(params?: any): Promise<Teacher[]> {
+    const response = await api.get<any>(API_ENDPOINTS.TEACHERS, { params })
+    return Array.isArray(response.data) ? response.data : (response.data.results || [])
   },
 
   async getPendingTeachers(): Promise<Teacher[]> {
-    const response = await api.get<Teacher[]>(API_ENDPOINTS.PENDING_TEACHERS)
-    return response.data
+    const response = await api.get<any>(API_ENDPOINTS.PENDING_TEACHERS)
+    return Array.isArray(response.data) ? response.data : (response.data.results || [])
   },
 
   async approveTeacher(id: number): Promise<{ message: string; teacher: Teacher }> {

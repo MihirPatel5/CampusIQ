@@ -26,7 +26,7 @@ import {
   Settings,
   ChevronDown,
 } from 'lucide-react'
-import { getInitials, getGreeting } from '@/lib/utils'
+import { getInitials } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export function Navbar() {
@@ -144,12 +144,12 @@ export function Navbar() {
                     {getInitials(`${user?.first_name || ''} ${user?.last_name || ''}`)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="hidden md:flex flex-col items-start">
+                <div className="hidden md:flex flex-col items-start text-left">
                   <span className="text-sm font-medium">
-                    {user?.first_name} {user?.last_name}
+                    {user?.first_name || user?.username || 'User'} {user?.last_name || ''}
                   </span>
                   <span className="text-xs text-muted-foreground capitalize">
-                    {user?.role}
+                    {user?.role || 'Guest'}
                   </span>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground hidden md:block" />

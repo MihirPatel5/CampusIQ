@@ -38,12 +38,14 @@ def mark_attendance(request):
         remarks = record.get('remarks', '')
         
         try:
-            student = StudentProfile.objects.get(id=student_id)
+            # Filter student by school
+            student = StudentProfile.objects.get(id=student_id, user__school=request.user.school)
             
             # Check if attendance already exists
             attendance, created = Attendance.objects.update_or_create(
                 student=student,
                 date=attendance_date,
+                school=request.user.school,  # Ensure record belongs to same school
                 defaults={
                     'class_obj_id': class_id,
                     'section_id': section_id,
@@ -92,14 +94,16 @@ def get_students_for_marking(request):
     students = StudentProfile.objects.filter(
         class_obj_id=class_id,
         section_id=section_id,
-        status='active'
+        status='active',
+        user__school=request.user.school
     ).select_related('user')
     
     # Get existing attendance for the date
     existing_attendance = Attendance.objects.filter(
         class_obj_id=class_id,
         section_id=section_id,
-        date=attendance_date
+        date=attendance_date,
+        school=request.user.school
     ).select_related('student')
     
     attendance_dict = {att.student_id: att for att in existing_attendance}
@@ -129,7 +133,8 @@ def student_attendance_history(request, student_id):
     date_from = request.query_params.get('date_from')
     date_to = request.query_params.get('date_to', str(date.today()))
     
-    queryset = Attendance.objects.filter(student_id=student_id)
+    # Ensure student belongs to user's school
+    queryset = Attendance.objects.filter(student_id=student_id, school=request.user.school)
     
     if date_from:
         queryset = queryset.filter(date__gte=date_from)
@@ -168,7 +173,17 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     ordering = ['-date']
     
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = Attendance.objects.select_related('student', 'class_obj', 'section', 'marked_by').all()
+        
+        # Super admin sees all attendance
+        if user.is_super_admin():
+            pass
+        # School admin/Teacher/Parent sees only their school's attendance
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')

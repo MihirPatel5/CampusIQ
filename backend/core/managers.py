@@ -47,6 +47,7 @@ class TenantManager(models.Manager):
         """
         queryset = TenantQuerySet(self.model, using=self._db)
         tenant = TenantContext.get_current_tenant()
+        print(f"DEBUG: TenantManager - Model: {self.model.__name__}, Tenant: {tenant}")
         
         # Super admin sees all data
         if tenant is None:

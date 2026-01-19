@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { GraduationCap, User, Phone, Mail, Lock, MapPin, Loader2, CheckCircle2 } from 'lucide-react'
+import { GraduationCap, User, Phone, Mail, Lock, MapPin, Loader2, CheckCircle2, Building2 } from 'lucide-react'
 import { teacherService } from '@/services/teacherService'
+import { schoolService } from '@/services/schoolService'
+import type { PublicSchool } from '@/types'
 import { getErrorMessage } from '@/services/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const registrationSchema = z.object({
   first_name: z.string().min(2, 'First name must be at least 2 characters'),
@@ -22,7 +25,8 @@ const registrationSchema = z.object({
   qualification: z.string().min(2, 'Qualification is required'),
   specialization: z.string().optional(),
   address: z.string().min(5, 'Address is required'),
-  school_verification_code: z.string().optional(),
+  school_id: z.string().min(1, 'Please select a school'),
+  school_verification_code: z.string().min(1, 'Verification code is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   password_confirm: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.password_confirm, {
@@ -37,24 +41,41 @@ export default function TeacherRegistrationPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [step, setStep] = useState(1)
+  const [schools, setSchools] = useState<PublicSchool[]>([])
+  const [isSchoolsLoading, setIsSchoolsLoading] = useState(true)
 
   const {
     register,
     handleSubmit,
     trigger,
+    control,
     formState: { errors },
   } = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
   })
+
+  useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        const data = await schoolService.getPublicSchools()
+        setSchools(data)
+      } catch (error) {
+        toast.error('Failed to load schools. Please refresh the page.')
+      } finally {
+        setIsSchoolsLoading(false)
+      }
+    }
+    fetchSchools()
+  }, [])
 
   const nextStep = async () => {
     let fields: (keyof RegistrationFormData)[] = []
     if (step === 1) {
       fields = ['first_name', 'last_name', 'email', 'phone', 'date_of_birth']
     } else if (step === 2) {
-      fields = ['qualification', 'specialization', 'address', 'school_verification_code']
+      fields = ['qualification', 'specialization', 'address', 'school_id', 'school_verification_code']
     }
-    
+
     const isValid = await trigger(fields)
     if (isValid) setStep((s) => s + 1)
   }
@@ -64,7 +85,12 @@ export default function TeacherRegistrationPage() {
   const onSubmit = async (data: RegistrationFormData) => {
     setIsLoading(true)
     try {
-      await teacherService.registerTeacher(data)
+      // transform school_id to number for backend
+      const payload = {
+        ...data,
+        school_id: parseInt(data.school_id)
+      }
+      await teacherService.registerTeacher(payload as any)
       setIsSuccess(true)
       toast.success('Registration successful! Please wait for admin approval.')
     } catch (error) {
@@ -84,7 +110,7 @@ export default function TeacherRegistrationPage() {
         <div className="space-y-2">
           <h2 className="text-3xl font-bold tracking-tight">Registration Submitted!</h2>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            Your application has been received and is currently under review by the school administration. 
+            Your application has been received and is currently under review by the school administration.
             You will receive an email once your account is approved.
           </p>
         </div>
@@ -115,10 +141,10 @@ export default function TeacherRegistrationPage() {
             {step === 2 && "Professional information and school association"}
             {step === 3 && "Secure your account with a password"}
           </CardDescription>
-          
+
           {/* Progress Bar */}
           <div className="w-full bg-muted h-1.5 rounded-full mt-4 overflow-hidden">
-            <motion.div 
+            <motion.div
               className="bg-primary h-full"
               initial={{ width: '33.33%' }}
               animate={{ width: `${(step / 3) * 100}%` }}
@@ -238,17 +264,54 @@ export default function TeacherRegistrationPage() {
                     />
                     {errors.address && <p className="text-xs text-destructive">{errors.address.message}</p>}
                   </div>
-                  <div className="space-y-2 p-4 bg-primary/5 rounded-lg border border-primary/10">
-                    <Label htmlFor="school_verification_code" className="text-primary font-semibold">School Verification Code (Optional)</Label>
-                    <p className="text-xs text-muted-foreground mb-2">Get this code from your school administrator if you know it</p>
-                    <Input
-                      id="school_verification_code"
-                      placeholder="XXXXXX-XXX"
-                      className="bg-background"
-                      {...register('school_verification_code')}
-                      error={!!errors.school_verification_code}
-                    />
-                    {errors.school_verification_code && <p className="text-xs text-destructive">{errors.school_verification_code.message}</p>}
+                  <div className="space-y-4 p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <div className="space-y-2">
+                      <Label htmlFor="school_id" className="text-primary font-semibold">Associated School</Label>
+                      <Controller
+                        name="school_id"
+                        control={control}
+                        render={({ field }) => (
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            disabled={isSchoolsLoading}
+                          >
+                            <SelectTrigger id="school_id" className="bg-background">
+                              <SelectValue placeholder={isSchoolsLoading ? "Loading schools..." : "Select your school"} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {schools.map((school) => (
+                                <SelectItem key={school.id} value={school.id.toString()}>
+                                  <div className="flex items-center gap-2">
+                                    {school.logo ? (
+                                      <img src={school.logo} alt={school.name} className="w-5 h-5 object-contain" />
+                                    ) : (
+                                      <Building2 className="w-4 h-4 text-muted-foreground" />
+                                    )}
+                                    <span>{school.name}</span>
+                                    <span className="text-xs text-muted-foreground ml-1">({school.city})</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.school_id && <p className="text-xs text-destructive">{errors.school_id.message}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="school_verification_code" className="text-primary font-semibold">School Verification Code</Label>
+                      <p className="text-xs text-muted-foreground mb-2">Required: Get this code from your school administrator</p>
+                      <Input
+                        id="school_verification_code"
+                        placeholder="XXXXXX-XXX"
+                        className="bg-background"
+                        {...register('school_verification_code')}
+                        error={!!errors.school_verification_code}
+                      />
+                      {errors.school_verification_code && <p className="text-xs text-destructive">{errors.school_verification_code.message}</p>}
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -305,7 +368,7 @@ export default function TeacherRegistrationPage() {
             >
               {step === 1 ? 'Cancel' : 'Back'}
             </Button>
-            
+
             {step < 3 ? (
               <Button type="button" onClick={nextStep}>
                 Next Step
@@ -325,7 +388,7 @@ export default function TeacherRegistrationPage() {
           </CardFooter>
         </form>
       </Card>
-      
+
       <p className="text-center text-sm text-muted-foreground mt-8">
         Already have an account?{' '}
         <Link to="/login" className="text-primary hover:underline font-medium">

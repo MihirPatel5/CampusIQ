@@ -1,3 +1,4 @@
+from core.views import TenantMixin
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsAdmin, IsAdminOrReadOnly
@@ -5,7 +6,7 @@ from .models import Class, Section, Subject, SubjectAssignment
 from .serializers import ClassSerializer, SectionSerializer, SubjectSerializer, SubjectAssignmentSerializer
 
 
-class ClassViewSet(viewsets.ModelViewSet):
+class ClassViewSet(TenantMixin, viewsets.ModelViewSet):
     """
     ViewSet for Class management
     List, Create, Retrieve, Update, Delete classes
@@ -24,16 +25,11 @@ class ClassViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset()
+        queryset = Class.objects.all()
         
-        # Super admin sees all classes
-        if user.is_super_admin():
-            pass
-        # School admin/Teacher/Parent sees only their school's classes
-        elif user.school:
-            queryset = queryset.filter(school=user.school)
-        else:
-            queryset = queryset.none()
+        # Super admin sees all (TenantManager handles this via TenantContext)
+        # Note: If TenantContext is set to None (Super Admin), we see all.
+        # If set to school, we see school's data.
         
         # Filter by academic year
         academic_year = self.request.query_params.get('academic_year')
@@ -48,13 +44,17 @@ class ClassViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        user = self.request.user
+        kwargs = {'created_by': user}
+        if user.school:
+            kwargs['school'] = user.school
+        serializer.save(**kwargs)
     
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
 
-class SectionViewSet(viewsets.ModelViewSet):
+class SectionViewSet(TenantMixin, viewsets.ModelViewSet):
     """
     ViewSet for Section management
     """
@@ -72,16 +72,7 @@ class SectionViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset()
-        
-        # Super admin sees all sections
-        if user.is_super_admin():
-            pass
-        # School admin/Teacher/Parent sees only their school's sections
-        elif user.school:
-            queryset = queryset.filter(class_obj__school=user.school)
-        else:
-            queryset = queryset.none()
+        queryset = Section.objects.select_related('class_obj').all()
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')
@@ -96,13 +87,18 @@ class SectionViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        user = self.request.user
+        kwargs = {'created_by': user}
+        print(f"DEBUG: SectionViewSet - User: {user}, School: {user.school if hasattr(user, 'school') else 'No Attr'}")
+        if user.school:
+            kwargs['school'] = user.school
+        serializer.save(**kwargs)
     
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
 
-class SubjectViewSet(viewsets.ModelViewSet):
+class SubjectViewSet(TenantMixin, viewsets.ModelViewSet):
     """
     ViewSet for Subject management
     """
@@ -120,16 +116,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset()
-        
-        # Super admin sees all subjects
-        if user.is_super_admin():
-            pass
-        # School admin/Teacher/Parent sees only their school's subjects
-        elif user.school:
-            queryset = queryset.filter(school=user.school)
-        else:
-            queryset = queryset.none()
+        queryset = Subject.objects.all()
         
         # Filter by type
         subject_type = self.request.query_params.get('type')
@@ -144,13 +131,17 @@ class SubjectViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        user = self.request.user
+        kwargs = {'created_by': user}
+        if user.school:
+            kwargs['school'] = user.school
+        serializer.save(**kwargs)
     
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
 
-class SubjectAssignmentViewSet(viewsets.ModelViewSet):
+class SubjectAssignmentViewSet(TenantMixin, viewsets.ModelViewSet):
     """
     ViewSet for SubjectAssignment management
     """
@@ -169,16 +160,9 @@ class SubjectAssignmentViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        queryset = super().get_queryset()
-        
-        # Super admin sees all assignments
-        if user.is_super_admin():
-            pass
-        # School admin/Teacher/Parent sees only their school's assignments
-        elif user.school:
-            queryset = queryset.filter(class_obj__school=user.school)
-        else:
-            queryset = queryset.none()
+        queryset = SubjectAssignment.objects.select_related(
+            'class_obj', 'section', 'subject', 'teacher', 'teacher__user'
+        ).all()
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')
@@ -213,7 +197,13 @@ class SubjectAssignmentViewSet(viewsets.ModelViewSet):
         return queryset
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        user = self.request.user
+        kwargs = {'created_by': user}
+        if user.school:
+            kwargs['school'] = user.school
+        serializer.save(**kwargs)
     
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
+
+
