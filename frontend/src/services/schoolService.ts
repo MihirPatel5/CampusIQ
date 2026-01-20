@@ -14,6 +14,10 @@ export const schoolService = {
     const response = await api.post('/schools/', data)
     return response.data
   },
+  createMySchool: async (data: Partial<School>): Promise<School> => {
+    const response = await api.post('/schools/onboard/', data)
+    return response.data
+  },
   updateSchool: async (id: number, data: Partial<School>): Promise<School> => {
     const response = await api.patch(`/schools/${id}/`, data)
     return response.data

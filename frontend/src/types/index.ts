@@ -79,6 +79,8 @@ export interface Section {
   code: string
   capacity?: number
   room_number?: string
+  class_teacher?: number  // Teacher ID
+  class_teacher_name?: string  // Teacher full name
   current_strength: number
   has_capacity: boolean
   status: 'active' | 'inactive'
@@ -122,6 +124,7 @@ export interface Teacher {
   address: string
   qualification: string
   specialization?: string
+  subjects?: number[]  // Array of subject IDs
   joining_date: string
   self_registered: boolean
   status: TeacherStatus
@@ -153,7 +156,6 @@ export interface TeacherRegistrationData {
   password: string
   password_confirm: string
   school_id: number
-  school_verification_code: string
 }
 
 // Student Types
@@ -172,26 +174,112 @@ export interface Parent {
 export interface Student {
   id: number
   user?: User
+
+  // Basic Information
+  admission_number: string
   first_name: string
+  middle_name?: string
   last_name: string
   full_name: string
-  admission_number: string
+  date_of_birth: string
+  gender: 'male' | 'female' | 'other'
+  blood_group?: string
+  photo?: string
+
+  // Personal Information
+  nationality?: string
+  religion?: string
+  category?: 'general' | 'obc' | 'sc' | 'st' | 'other'
+  mother_tongue?: string
+  caste?: string
+  aadhaar_number?: string
+
+  // Contact Information
+  email?: string
+  phone?: string
+  alternate_phone?: string
+  address: string
+  city: string
+  state: string
+  pincode: string
+
+  // Emergency Contact
+  emergency_contact_name?: string
+  emergency_contact_phone?: string
+  emergency_contact_relation?: string
+
+  // Medical Information
+  height?: number
+  weight?: number
+  medical_conditions?: string
+  allergies?: string
+  vaccination_status?: string
+
+  // Academic Information
+  admission_date: string
+  roll_number?: string
   class_obj: number
   class_name: string
   section: number
   section_name: string
-  roll_number?: string
-  date_of_birth: string
-  gender: 'male' | 'female' | 'other'
-  blood_group?: string
-  email?: string
-  phone?: string
-  address: string
-  admission_date: string
+  previous_school?: string
+  previous_class?: string
+  previous_marks?: number
+  tc_number?: string
+  tc_date?: string
+
+  // Documents
+  birth_certificate?: string
+  transfer_certificate?: string
+  aadhar_card?: string
+  caste_certificate?: string
+
+  // Transport
+  transport_required?: boolean
+  bus_route?: string
+  pickup_point?: string
+
+  // Hostel
+  hostel_required?: boolean
+  hostel_room_preference?: string
+
+  // Custom Fields
+  custom_fields?: Record<string, any>
+
+  // Status & Relations
   status: StudentStatus
   parents?: Parent[]
-  photo?: string
   created_at: string
+}
+
+// Admission Form Configuration Types
+export type FieldType = 'text' | 'email' | 'number' | 'date' | 'select' | 'textarea' | 'file' | 'image' | 'checkbox' | 'decimal'
+export type FormSection = 'basic' | 'personal' | 'contact' | 'emergency' | 'medical' | 'academic' | 'documents' | 'transport' | 'hostel' | 'parent'
+
+export interface FieldOption {
+  value: string
+  label: string
+}
+
+export interface AdmissionFormConfig {
+  id: number
+  field_name: string
+  field_label: string
+  field_type: FieldType
+  section: FormSection
+  is_visible: boolean
+  is_required: boolean
+  display_order: number
+  help_text: string
+  placeholder: string
+  options: FieldOption[]
+  validation_rules: Record<string, any>
+  created_at: string
+  updated_at: string
+}
+
+export interface GroupedFormConfig {
+  [section: string]: AdmissionFormConfig[]
 }
 
 // Attendance Types
@@ -332,4 +420,31 @@ export interface ApiError {
   message: string
   errors?: Record<string, string[]>
 }
+// Timetable Types
+export interface Period {
+  id: number
+  name: string
+  start_time: string
+  end_time: string
+  is_break: boolean
+  order: number
+  created_at: string
+}
 
+export interface TimetableEntry {
+  id: number
+  class_obj: number
+  class_name: string
+  section: number
+  section_name: string
+  day_of_week: number
+  period: number
+  period_name: string
+  period_time: string
+  subject: number
+  subject_name: string
+  teacher: number
+  teacher_name: string
+  academic_year: string
+  created_at: string
+}

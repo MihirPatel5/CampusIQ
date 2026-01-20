@@ -4,7 +4,8 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     CustomTokenObtainPairView, teacher_self_register, TeacherViewSet,
     SchoolViewSet, get_verification_code, regenerate_verification_code,
-    DashboardStatsView, PublicSchoolListView, get_me, logout
+    DashboardStatsView, PublicSchoolListView, get_me, logout,
+    register_school_admin, verify_otp, create_own_school
 )
 
 router = DefaultRouter()
@@ -16,6 +17,11 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('auth/me/', get_me, name='get-me'),
     path('auth/logout/', logout, name='logout'),
+    
+    # School Admin Registration Flow
+    path('auth/register-admin/', register_school_admin, name='register-school-admin'),
+    path('auth/verify-otp/', verify_otp, name='verify-otp'),
+    path('schools/onboard/', create_own_school, name='create-own-school'),
     
     # Teacher self-registration
     path('teachers/self-register/', teacher_self_register, name='teacher-self-register'),

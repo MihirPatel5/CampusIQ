@@ -31,6 +31,27 @@ export const studentService = {
     const response = await api.get(API_ENDPOINTS.STUDENT_PARENTS(id))
     return response.data
   },
+
+  // Admission Form Configuration
+  async getFormConfig(): Promise<any> {
+    const response = await api.get('/students/admission-form-config/')
+    return response.data
+  },
+
+  async getFormConfigBySection(): Promise<any> {
+    const response = await api.get('/students/admission-form-config/by-section/')
+    return response.data
+  },
+
+  async updateFormConfig(id: number, data: any): Promise<any> {
+    const response = await api.patch(`/students/admission-form-config/${id}/`, data)
+    return response.data
+  },
+
+  async resetFormConfigToDefaults(): Promise<any> {
+    const response = await api.post('/students/admission-form-config/reset-to-defaults/')
+    return response.data
+  },
 }
 
 export default studentService

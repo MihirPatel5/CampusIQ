@@ -38,6 +38,7 @@ class User(AbstractUser):
     objects = UserManager()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_email_verified = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
@@ -209,6 +210,14 @@ class TeacherProfile(AuditModel):
     )
     rejection_reason = models.TextField(blank=True, help_text="Reason for rejection if status is rejected")
     
+    # Academic
+    subjects = models.ManyToManyField(
+        'academic.Subject',
+        blank=True,
+        related_name='teachers',
+        help_text="Subjects this teacher is qualified to teach"
+    )
+    
     # School transfer fields
     transfer_requested_to = models.ForeignKey(
         School,
@@ -307,3 +316,28 @@ class TeacherProfile(AuditModel):
         self.rejection_reason = rejection_reason
         self.status = 'active'
         self.save()
+
+
+class OTPVerification(models.Model):
+    """
+    Model to store OTP codes for user verification
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otp_codes')
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_verified = models.BooleanField(default=False)
+    
+    class Meta:
+        db_table = 'otp_verification'
+        indexes = [
+            models.Index(fields=['user', 'otp']),
+            models.Index(fields=['expires_at']),
+        ]
+        
+    def __str__(self):
+        return f"OTP for {self.user.username}"
+    
+    def is_expired(self):
+        from django.utils import timezone
+        return timezone.now() > self.expires_at

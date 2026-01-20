@@ -2,8 +2,8 @@ from core.views import TenantMixin
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsAdmin, IsAdminOrReadOnly
-from .models import Class, Section, Subject, SubjectAssignment
-from .serializers import ClassSerializer, SectionSerializer, SubjectSerializer, SubjectAssignmentSerializer
+from .models import Class, Section, Subject, SubjectAssignment, Period, TimetableEntry
+from .serializers import ClassSerializer, SectionSerializer, SubjectSerializer, SubjectAssignmentSerializer, PeriodSerializer, TimetableEntrySerializer
 
 
 class ClassViewSet(TenantMixin, viewsets.ModelViewSet):
@@ -203,6 +203,96 @@ class SubjectAssignmentViewSet(TenantMixin, viewsets.ModelViewSet):
             kwargs['school'] = user.school
         serializer.save(**kwargs)
     
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+
+class PeriodViewSet(TenantMixin, viewsets.ModelViewSet):
+    """
+    ViewSet for Period management
+    """
+    queryset = Period.objects.all()
+    serializer_class = PeriodSerializer
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['order']
+    ordering = ['order']
+    
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdmin()]
+        return [IsAuthenticated()]
+    
+    def get_queryset(self):
+        # TenantMixin automatically filters by school
+        return Period.objects.all()
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        kwargs = {'created_by': user}
+        if user.school:
+            kwargs['school'] = user.school
+        serializer.save(**kwargs)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+
+class TimetableEntryViewSet(TenantMixin, viewsets.ModelViewSet):
+    """
+    ViewSet for Timetable management
+    """
+    queryset = TimetableEntry.objects.select_related(
+        'class_obj', 'section', 'subject', 'teacher', 'teacher__user', 'period'
+    ).all()
+    serializer_class = TimetableEntrySerializer
+    filter_backends = [filters.OrderingFilter]
+    ordering_fields = ['day_of_week', 'period__order']
+    ordering = ['day_of_week', 'period__order']
+    
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdmin()]
+        return [IsAuthenticated()]
+    
+    def get_queryset(self):
+        queryset = TimetableEntry.objects.select_related(
+            'class_obj', 'section', 'subject', 'teacher', 'teacher__user', 'period'
+        ).all()
+        
+        # Filter by class
+        class_id = self.request.query_params.get('class_id')
+        if class_id:
+            queryset = queryset.filter(class_obj_id=class_id)
+        
+        # Filter by section
+        section_id = self.request.query_params.get('section_id')
+        if section_id:
+            queryset = queryset.filter(section_id=section_id)
+        
+        # Filter by teacher
+        teacher_id = self.request.query_params.get('teacher_id')
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+            
+        # Filter by academic year
+        academic_year = self.request.query_params.get('academic_year')
+        if academic_year:
+            queryset = queryset.filter(academic_year=academic_year)
+            
+        # Filter by day
+        day = self.request.query_params.get('day')
+        if day:
+            queryset = queryset.filter(day_of_week=day)
+            
+        return queryset
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        kwargs = {'created_by': user}
+        if user.school:
+            kwargs['school'] = user.school
+        serializer.save(**kwargs)
+
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 

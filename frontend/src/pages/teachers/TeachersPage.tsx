@@ -1,22 +1,27 @@
 import { useState, useEffect } from 'react'
-import { 
-  Plus, 
-  Search, 
-  User, 
-  Mail, 
-  Phone, 
+import {
+  Plus,
+  Search,
+  User,
+  Mail,
+  Phone,
   GraduationCap,
   CheckCircle2,
   XCircle,
   Clock,
   Loader2,
   Building2,
-  Calendar
+  Calendar,
+  BookOpen
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import { teacherService } from '@/services/teacherService'
+import { academicService } from '@/services/academicService'
 import { getErrorMessage } from '@/services/api'
-import type { Teacher } from '@/types'
+import type { Teacher, Subject } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
@@ -36,31 +41,69 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from '@/components/ui/label'
+import { ScrollArea } from "@/components/ui/scroll-area"
+
+const teacherSchema = z.object({
+  first_name: z.string().min(1, 'First name is required'),
+  last_name: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Invalid email address'),
+  phone: z.string().min(10, 'Phone number must be at least 10 digits'),
+  qualification: z.string().min(1, 'Qualification is required'),
+  specialization: z.string().optional(),
+  date_of_birth: z.string().optional(), // Adjust if date object
+  joining_date: z.string().min(1, 'Joining date is required'),
+  address: z.string().min(5, 'Address is required'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  subjects: z.array(z.number()).optional()
+})
+
+type TeacherFormData = z.infer<typeof teacherSchema>
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [pendingTeachers, setPendingTeachers] = useState<Teacher[]>([])
+  const [subjects, setSubjects] = useState<Subject[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('all')
   const [search, setSearch] = useState('')
-  
+
   // Rejection Dialog State
   const [rejectionId, setRejectionId] = useState<number | null>(null)
   const [rejectionReason, setRejectionReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Add Teacher Dialog State
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors }
+  } = useForm<TeacherFormData>({
+    resolver: zodResolver(teacherSchema),
+    defaultValues: {
+      joining_date: new Date().toISOString().split('T')[0],
+      subjects: []
+    }
+  })
+
   useEffect(() => {
     fetchTeachers()
     fetchPendingTeachers()
+    fetchSubjects()
   }, [])
 
   const fetchTeachers = async () => {
     setIsLoading(true)
     try {
       const response = await teacherService.getTeachers()
-      // getTeachers might return paginated or array
       const data = Array.isArray(response) ? response : response.results
       setTeachers(data)
     } catch (error) {
@@ -76,6 +119,15 @@ export default function TeachersPage() {
       setPendingTeachers(data)
     } catch (error) {
       console.error('Error fetching pending teachers:', error)
+    }
+  }
+
+  const fetchSubjects = async () => {
+    try {
+      const data = await academicService.getSubjects()
+      setSubjects(data)
+    } catch (error) {
+      console.error('Error fetching subjects:', error)
     }
   }
 
@@ -106,7 +158,33 @@ export default function TeachersPage() {
     }
   }
 
-  const filteredTeachers = teachers.filter(t => 
+  const onSubmit = async (data: TeacherFormData) => {
+    setIsSaving(true)
+    try {
+      await teacherService.createTeacher(data as any) // Type assertion if API expects specific shape
+      toast.success('Teacher account created successfully')
+      setIsAddOpen(false)
+      reset()
+      fetchTeachers()
+    } catch (error) {
+      toast.error(getErrorMessage(error))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const selectedSubjects = watch('subjects') || []
+
+  const toggleSubject = (subjectId: number) => {
+    const current = selectedSubjects
+    if (current.includes(subjectId)) {
+      setValue('subjects', current.filter(id => id !== subjectId))
+    } else {
+      setValue('subjects', [...current, subjectId])
+    }
+  }
+
+  const filteredTeachers = teachers.filter(t =>
     t.user.first_name.toLowerCase().includes(search.toLowerCase()) ||
     t.user.last_name.toLowerCase().includes(search.toLowerCase()) ||
     t.user.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -120,10 +198,124 @@ export default function TeachersPage() {
           <h1 className="text-3xl font-bold tracking-tight">Teachers</h1>
           <p className="text-muted-foreground mt-1">Manage teaching staff and approval requests.</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Teacher
-        </Button>
+
+        <Dialog open={isAddOpen} onOpenChange={(open) => {
+          setIsAddOpen(open)
+          if (!open) reset()
+        }}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Teacher
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Add New Teacher</DialogTitle>
+              <DialogDescription>Create a new teacher account and assign subjects.</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto pr-2">
+              <form id="addTeacherForm" onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="first_name">First Name</Label>
+                    <Input id="first_name" {...register('first_name')} />
+                    {errors.first_name && <p className="text-xs text-destructive">{errors.first_name.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="last_name">Last Name</Label>
+                    <Input id="last_name" {...register('last_name')} />
+                    {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" {...register('email')} />
+                    {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input id="phone" {...register('phone')} />
+                    {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input id="password" type="password" {...register('password')} />
+                  {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="qualification">Qualification</Label>
+                    <Input id="qualification" placeholder="e.g. M.Sc. Mathematics" {...register('qualification')} />
+                    {errors.qualification && <p className="text-xs text-destructive">{errors.qualification.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="specialization">Specialization</Label>
+                    <Input id="specialization" placeholder="e.g. Algebra" {...register('specialization')} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="joining_date">Joining Date</Label>
+                    <Input id="joining_date" type="date" {...register('joining_date')} />
+                    {errors.joining_date && <p className="text-xs text-destructive">{errors.joining_date.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="date_of_birth">Date of Birth</Label>
+                    <Input id="date_of_birth" type="date" {...register('date_of_birth')} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input id="address" {...register('address')} />
+                  {errors.address && <p className="text-xs text-destructive">{errors.address.message}</p>}
+                </div>
+
+                {/* Subjects Selection */}
+                <div className="space-y-2">
+                  <Label>Assign Subjects</Label>
+                  <ScrollArea className="h-32 w-full rounded-md border p-4">
+                    <div className="grid grid-cols-2 gap-2">
+                      {subjects.length > 0 ? subjects.map((subject) => (
+                        <div key={subject.id} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`subject-${subject.id}`}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            checked={selectedSubjects.includes(subject.id)}
+                            onChange={() => toggleSubject(subject.id)}
+                          />
+                          <label
+                            htmlFor={`subject-${subject.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {subject.name} <span className="text-xs text-muted-foreground">({subject.code})</span>
+                          </label>
+                        </div>
+                      )) : (
+                        <p className="text-sm text-muted-foreground col-span-2">No subjects found. Add subjects in Academic section first.</p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </form>
+            </div>
+            <DialogFooter className="pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
+              <Button type="submit" form="addTeacherForm" disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Account
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -199,6 +391,8 @@ export default function TeachersPage() {
                         <Building2 className="h-3.5 w-3.5" />
                         <span>{teacher.specialization || teacher.qualification}</span>
                       </div>
+                      {/* Show Subjects if any */}
+                      {/* Note: Teacher interface might not have subjects populated fully yet unless backend sends it. Use optional chaining */}
                     </div>
                   </CardContent>
                   <CardFooter className="bg-muted/30 border-t pt-4 text-xs flex justify-between">
@@ -251,16 +445,16 @@ export default function TeachersPage() {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-3 w-full md:w-auto">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           className="flex-1 md:flex-none border-destructive text-destructive hover:bg-destructive/10"
                           onClick={() => setRejectionId(teacher.id)}
                         >
                           <XCircle className="w-4 h-4 mr-2" /> Reject
                         </Button>
-                        <Button 
+                        <Button
                           className="flex-1 md:flex-none bg-green-600 hover:bg-green-700"
                           onClick={() => handleApprove(teacher.id)}
                         >
@@ -293,9 +487,9 @@ export default function TeachersPage() {
           </DialogHeader>
           <div className="py-4">
             <Label htmlFor="reason">Reason for Rejection</Label>
-            <Input 
-              id="reason" 
-              placeholder="e.g., Incomplete documentation, mismatch in credentials" 
+            <Input
+              id="reason"
+              placeholder="e.g., Incomplete documentation, mismatch in credentials"
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               className="mt-2"

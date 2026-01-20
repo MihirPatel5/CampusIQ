@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError
-from .models import User, School, TeacherProfile
+from .models import User, School, TeacherProfile, OTPVerification
 from datetime import date
 
 
@@ -32,7 +32,6 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
         required=True,
         help_text="The school the teacher is registering for"
     )
-    school_verification_code = serializers.CharField(write_only=True, required=True)
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
     email = serializers.EmailField(required=True)
@@ -42,7 +41,7 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'date_of_birth',
             'qualification', 'specialization', 'address',
-            'password', 'password_confirm', 'school_id', 'school_verification_code'
+            'password', 'password_confirm', 'school_id'
         ]
     
     def validate(self, attrs):
@@ -50,14 +49,8 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError({"password": "Passwords don't match"})
         
-        # Verify school verification code
-        school = attrs.get('school')
-        verification_code = attrs.get('school_verification_code')
-        
-        if school.school_verification_code != verification_code:
-            raise serializers.ValidationError({"school_verification_code": "Invalid verification code for the selected school"})
-        
         # Check email/phone uniqueness within the school
+        school = attrs.get('school')
         email = attrs['email']
         phone = attrs['phone']
         
@@ -74,7 +67,6 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password')
         validated_data.pop('password_confirm')
         school = validated_data.pop('school')
-        validated_data.pop('school_verification_code')
         first_name = validated_data.pop('first_name')
         last_name = validated_data.pop('last_name')
         email = validated_data.pop('email')
@@ -114,7 +106,7 @@ class TeacherProfileSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'full_name', 'employee_id', 'phone', 'date_of_birth',
             'joining_date', 'qualification', 'specialization', 'address',
-            'status', 'self_registered', 'rejection_reason',
+            'status', 'self_registered', 'rejection_reason', 'subjects',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'status', 'self_registered', 'created_at', 'updated_at']
@@ -123,19 +115,26 @@ class TeacherProfileSerializer(serializers.ModelSerializer):
         return obj.user.get_full_name()
 
 
+from academic.models import Subject
+
 class TeacherCreateSerializer(serializers.ModelSerializer):
     """Serializer for admin creating teacher accounts"""
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
     email = serializers.EmailField(required=True)
+    subjects = serializers.PrimaryKeyRelatedField(
+        queryset=Subject.objects.all(),
+        many=True,
+        required=False
+    )
     
     class Meta:
         model = TeacherProfile
         fields = [
             'first_name', 'last_name', 'email', 'phone', 'date_of_birth',
             'employee_id', 'joining_date', 'qualification', 'specialization',
-            'address', 'password'
+            'address', 'password', 'subjects'
         ]
     
     def validate_email(self, value):
@@ -159,6 +158,7 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
         first_name = validated_data.pop('first_name')
         last_name = validated_data.pop('last_name')
         email = validated_data.pop('email')
+        subjects = validated_data.pop('subjects', [])
         
         # Get admin's school
         request = self.context.get('request')
@@ -190,6 +190,10 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
             created_by=request.user if request else None,
             **validated_data
         )
+        
+        # Assign subjects
+        if subjects:
+            teacher_profile.subjects.set(subjects)
         
         return teacher_profile
 
@@ -238,3 +242,106 @@ class PublicSchoolSerializer(serializers.ModelSerializer):
     class Meta:
         model = School
         fields = ['id', 'name', 'logo', 'city', 'state']
+
+
+class SchoolAdminRegistrationSerializer(serializers.ModelSerializer):
+    """Serializer for school admin self-registration"""
+    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password_confirm = serializers.CharField(write_only=True, required=True)
+    
+    class Meta:
+        model = User
+        fields = ['username', 'email', 'first_name', 'last_name', 'password', 'password_confirm', 'phone']
+        extra_kwargs = {
+            'first_name': {'required': True},
+            'last_name': {'required': True},
+            'email': {'required': True},
+        }
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password_confirm']:
+            raise serializers.ValidationError({"password": "Passwords don't match"})
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop('password_confirm')
+        password = validated_data.pop('password')
+        
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=password,
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            role='admin',
+            school=None,  # No school initially
+            is_active=False,  # Inactive until OTP verification
+            is_email_verified=False
+        )
+        return user
+
+
+class OTPVerifySerializer(serializers.Serializer):
+    """Serializer for OTP verification"""
+    email = serializers.EmailField(required=True)
+    otp = serializers.CharField(min_length=6, max_length=6, required=True)
+
+    def validate(self, attrs):
+        email = attrs.get('email')
+        otp = attrs.get('otp')
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid email address")
+
+        if user.is_email_verified:
+             raise serializers.ValidationError("Email already verified")
+
+        try:
+            verification = OTPVerification.objects.filter(user=user, is_verified=False).latest('created_at')
+        except OTPVerification.DoesNotExist:
+            raise serializers.ValidationError("No OTP found for this user")
+
+        if verification.is_expired():
+            raise serializers.ValidationError("OTP has expired")
+
+        if verification.otp != otp:
+             raise serializers.ValidationError("Invalid OTP")
+             
+        attrs['user'] = user
+        attrs['verification'] = verification
+        return attrs
+
+
+class SchoolOnboardingSerializer(serializers.ModelSerializer):
+    """Serializer for verified admin to create their own school"""
+    
+    class Meta:
+        model = School
+        fields = [
+            'id', 'name', 'address', 'city', 'state', 'pincode', 
+            'phone', 'email', 'website', 'established_year', 'affiliation'
+        ]
+        extra_kwargs = {
+            'name': {'required': True},
+            'city': {'required': True},
+            'state': {'required': True},
+        }
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user
+        
+        # Create school with current user as creator/updater
+        school = School.objects.create(
+            created_by=user,
+            updated_by=user,
+            **validated_data
+        )
+        
+        # Link user to school
+        user.school = school
+        user.save()
+        
+        return school

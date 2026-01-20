@@ -26,7 +26,6 @@ const registrationSchema = z.object({
   specialization: z.string().optional(),
   address: z.string().min(5, 'Address is required'),
   school_id: z.string().min(1, 'Please select a school'),
-  school_verification_code: z.string().min(1, 'Verification code is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   password_confirm: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.password_confirm, {
@@ -73,7 +72,7 @@ export default function TeacherRegistrationPage() {
     if (step === 1) {
       fields = ['first_name', 'last_name', 'email', 'phone', 'date_of_birth']
     } else if (step === 2) {
-      fields = ['qualification', 'specialization', 'address', 'school_id', 'school_verification_code']
+      fields = ['qualification', 'specialization', 'address', 'school_id']
     }
 
     const isValid = await trigger(fields)
@@ -300,18 +299,6 @@ export default function TeacherRegistrationPage() {
                       {errors.school_id && <p className="text-xs text-destructive">{errors.school_id.message}</p>}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="school_verification_code" className="text-primary font-semibold">School Verification Code</Label>
-                      <p className="text-xs text-muted-foreground mb-2">Required: Get this code from your school administrator</p>
-                      <Input
-                        id="school_verification_code"
-                        placeholder="XXXXXX-XXX"
-                        className="bg-background"
-                        {...register('school_verification_code')}
-                        error={!!errors.school_verification_code}
-                      />
-                      {errors.school_verification_code && <p className="text-xs text-destructive">{errors.school_verification_code.message}</p>}
-                    </div>
                   </div>
                 </motion.div>
               )}

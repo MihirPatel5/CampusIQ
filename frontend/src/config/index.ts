@@ -31,6 +31,9 @@ export const API_ENDPOINTS = {
   LOGOUT: '/auth/logout/',
   REFRESH: '/auth/refresh/', // Backend uses /auth/refresh/ per test script
   ME: '/auth/me/',
+  REGISTER_ADMIN: '/auth/register-admin/',
+  VERIFY_OTP: '/auth/verify-otp/',
+  ONBOARD_SCHOOL: '/schools/onboard/',
   DASHBOARD_STATS: '/dashboard/stats/',
 
   // Teachers

@@ -25,4 +25,8 @@ else:
 EOF
 
 echo "Starting server..."
-python manage.py runserver 0.0.0.0:8000
+if [ "$ENVIRONMENT" = "production" ]; then
+    exec gunicorn school_erp.wsgi:application --bind 0.0.0.0:8000 --workers 3
+else
+    python manage.py runserver 0.0.0.0:8000
+fi

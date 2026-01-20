@@ -27,6 +27,16 @@ export const authService = {
     })
     return response.data
   },
+
+  async registerAdmin(data: any): Promise<{ message: string; email: string }> {
+    const response = await api.post(API_ENDPOINTS.REGISTER_ADMIN, data)
+    return response.data
+  },
+
+  async verifyOTP(email: string, otp: string): Promise<LoginResponse> {
+    const response = await api.post(API_ENDPOINTS.VERIFY_OTP, { email, otp })
+    return response.data
+  },
 }
 
 export default authService

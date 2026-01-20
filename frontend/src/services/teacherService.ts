@@ -13,6 +13,11 @@ export const teacherService = {
     return Array.isArray(response.data) ? response.data : (response.data.results || [])
   },
 
+  async createTeacher(data: TeacherRegistrationData): Promise<Teacher> {
+    const response = await api.post<Teacher>(API_ENDPOINTS.TEACHERS, data)
+    return response.data
+  },
+
   async getPendingTeachers(): Promise<Teacher[]> {
     const response = await api.get<any>(API_ENDPOINTS.PENDING_TEACHERS)
     return Array.isArray(response.data) ? response.data : (response.data.results || [])

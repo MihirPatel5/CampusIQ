@@ -10,11 +10,18 @@ from .models import User, School, TeacherProfile
 from .serializers import (
     UserSerializer, LoginSerializer, TeacherRegistrationSerializer,
     TeacherProfileSerializer, TeacherCreateSerializer, SchoolSerializer,
-    PublicSchoolSerializer
+    PublicSchoolSerializer, SchoolAdminRegistrationSerializer, OTPVerifySerializer,
+    SchoolOnboardingSerializer
 )
 from .permissions import IsAdmin, IsActiveTeacher, IsSuperAdmin
 from students.models import StudentProfile
-from .models import User, School, TeacherProfile
+from .models import User, School, TeacherProfile, OTPVerification
+from django.utils import timezone
+from datetime import timedelta
+import random
+import string
+from django.core.mail import send_mail
+from django.conf import settings
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -357,3 +364,100 @@ class DashboardStatsView(APIView):
             })
         
         return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+
+
+from core.services.email_service import send_otp_email
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def register_school_admin(request):
+    """
+    Step 1: Register new school admin (inactive) and send OTP
+    """
+    serializer = SchoolAdminRegistrationSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
+        
+        # Generate 6-digit OTP
+        otp_code = ''.join(random.choices(string.digits, k=6))
+        
+        # Save OTP
+        OTPVerification.objects.create(
+            user=user,
+            otp=otp_code,
+            expires_at=timezone.now() + timedelta(minutes=10)
+        )
+        
+        # Send Email
+        try:
+            send_otp_email(user.email, otp_code, user.first_name)
+        except Exception as e:
+            # If email fails, shouldn't rollback user but might need handling
+            print(f"Failed to send email: {e}")
+        
+        return Response({
+            'message': 'Registration successful. Please verify your email.',
+            'email': user.email
+        }, status=status.HTTP_201_CREATED)
+        
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    """
+    Step 2: Verify OTP and activate account
+    """
+    serializer = OTPVerifySerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        verification = serializer.validated_data['verification']
+        
+        # Mark Verification as used
+        verification.is_verified = True
+        verification.save()
+        
+        # Activate User
+        user.is_email_verified = True
+        user.is_active = True
+        user.save()
+        
+        # Generate Token for auto-login
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'message': 'Email verified successfully',
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': UserSerializer(user).data
+        })
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_own_school(request):
+    """
+    Step 3: Verified admin creates their school
+    """
+    user = request.user
+    
+    # Security checks
+    if user.role != 'admin':
+        return Response({'error': 'Only admins can create schools through this flow'}, status=status.HTTP_403_FORBIDDEN)
+        
+    if user.school:
+        return Response({'error': 'You are already associated with a school'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    serializer = SchoolOnboardingSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        school = serializer.save()
+        return Response({
+            'message': 'School created successfully',
+            'school': SchoolSerializer(school).data
+        }, status=status.HTTP_201_CREATED)
+        
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

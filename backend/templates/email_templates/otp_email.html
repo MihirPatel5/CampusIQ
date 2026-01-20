@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .header {
+            background-color: #2563eb;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .otp-code {
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 5px;
+            text-align: center;
+            margin: 20px 0;
+            color: #2563eb;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>CampusIQ Verification</h2>
+        </div>
+        <div class="content">
+            <p>Hello {{ user_name }},</p>
+            <p>Thank you for registering with CampusIQ. To verify your email address, please use the following OTP code:
+            </p>
+
+            <div class="otp-code">{{ otp }}</div>
+
+            <p>This code will expire in 10 minutes.</p>
+            <p>If you did not request this code, please ignore this email.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; {% now "Y" %} CampusIQ. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+
+</html>

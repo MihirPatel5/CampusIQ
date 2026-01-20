@@ -9,7 +9,10 @@ import { LoadingScreen } from './components/ui/loading-screen'
 // Lazy load pages for better performance
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
 const TeacherRegistrationPage = lazy(() => import('./pages/auth/TeacherRegistrationPage'))
+const RegisterAdminPage = lazy(() => import('./pages/auth/RegisterAdminPage'))
+const OTPVerificationPage = lazy(() => import('./pages/auth/OTPVerificationPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'))
+const CreateSchoolFlow = lazy(() => import('./pages/onboarding/CreateSchoolFlow'))
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 const SchoolsPage = lazy(() => import('./pages/admin/SchoolsPage'))
@@ -21,6 +24,8 @@ const SubjectsPage = lazy(() => import('./pages/academic/SubjectsPage'))
 const AttendancePage = lazy(() => import('./pages/attendance/AttendancePage'))
 const ExamsPage = lazy(() => import('./pages/exams/ExamsPage'))
 const FeesPage = lazy(() => import('./pages/fees/FeesPage'))
+const PeriodConfigurationPage = lazy(() => import('./pages/academic/PeriodConfigurationPage'))
+const ClassTimetableManagerPage = lazy(() => import('./pages/academic/ClassTimetableManagerPage'))
 
 function App() {
   return (
@@ -31,12 +36,15 @@ function App() {
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register/teacher" element={<TeacherRegistrationPage />} />
+            <Route path="/register-admin" element={<RegisterAdminPage />} />
+            <Route path="/verify-otp" element={<OTPVerificationPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           </Route>
         </Route>
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
+          <Route path="/schools/onboard" element={<CreateSchoolFlow />} />
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
 
@@ -57,9 +65,11 @@ function App() {
             <Route path="/students/admission" element={<StudentAdmissionPage />} />
             <Route path="/classes" element={<ClassesPage />} />
             <Route path="/subjects" element={<SubjectsPage />} />
+            <Route path="/subjects" element={<SubjectsPage />} />
+            <Route path="/academic/periods" element={<PeriodConfigurationPage />} />
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/exams" element={<ExamsPage />} />
-            <Route path="/timetable" element={<ComingSoon title="Timetable" />} />
+            <Route path="/timetable" element={<ClassTimetableManagerPage />} />
             <Route path="/notices" element={<ComingSoon title="Notices" />} />
             <Route path="/library" element={<ComingSoon title="Library" />} />
             <Route path="/transport" element={<ComingSoon title="Transport" />} />

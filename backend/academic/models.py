@@ -50,6 +50,14 @@ class Section(TenantAwareModel):
     code = models.CharField(max_length=20, help_text="e.g., '10-A', '10-B'")
     capacity = models.IntegerField(null=True, blank=True, help_text="Maximum students allowed")
     room_number = models.CharField(max_length=20, blank=True)
+    class_teacher = models.ForeignKey(
+        'accounts.TeacherProfile',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='class_teacher_of',
+        help_text="Class teacher assigned to this section"
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     
     class Meta:
@@ -177,3 +185,121 @@ class SubjectAssignment(TenantAwareModel):
             raise ValidationError('Section must belong to the same school')
         if self.subject.school_id != self.school_id:
             raise ValidationError('Subject must belong to the same school')
+
+
+class Period(TenantAwareModel):
+    """
+    Timetable periods definition for a school (e.g., "Period 1", "Morning Break").
+    Multi-tenant.
+    """
+    name = models.CharField(max_length=100, help_text="e.g., 'Period 1', 'Lunch Break'")
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_break = models.BooleanField(default=False, help_text="If True, no classes are scheduled")
+    order = models.IntegerField(default=1, help_text="Ordering for display")
+
+    class Meta:
+        db_table = 'periods'
+        verbose_name = 'Period'
+        verbose_name_plural = 'Periods'
+        ordering = ['order']
+        indexes = [
+            models.Index(fields=['school', 'order']),
+        ]
+        unique_together = [('school', 'order'), ('school', 'name')]
+
+    def __str__(self):
+        return f"{self.name} ({self.start_time.strftime('%H:%M')} - {self.end_time.strftime('%H:%M')})"
+
+
+class TimetableEntry(TenantAwareModel):
+    """
+    Actual schedule entry mapping class/section/day/period to subject/teacher.
+    Multi-tenant.
+    """
+    DAY_CHOICES = [
+        (1, 'Monday'),
+        (2, 'Tuesday'),
+        (3, 'Wednesday'),
+        (4, 'Thursday'),
+        (5, 'Friday'),
+        (6, 'Saturday'),
+        (7, 'Sunday'),
+    ]
+
+    class_obj = models.ForeignKey(
+        Class,
+        on_delete=models.CASCADE,
+        related_name='timetable_entries'
+    )
+    section = models.ForeignKey(
+        Section,
+        on_delete=models.CASCADE,
+        related_name='timetable_entries'
+    )
+    day_of_week = models.IntegerField(choices=DAY_CHOICES)
+    period = models.ForeignKey(
+        Period,
+        on_delete=models.CASCADE,
+        related_name='timetable_entries'
+    )
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name='timetable_entries'
+    )
+    teacher = models.ForeignKey(
+        'accounts.TeacherProfile',
+        on_delete=models.CASCADE,
+        related_name='timetable_entries'
+    )
+    academic_year = models.CharField(max_length=10, help_text="e.g., '2024-25'")
+
+    class Meta:
+        db_table = 'timetable_entries'
+        verbose_name = 'Timetable Entry'
+        verbose_name_plural = 'Timetable Entries'
+        indexes = [
+            models.Index(fields=['school', 'class_obj', 'section']),
+            models.Index(fields=['teacher']),
+            models.Index(fields=['day_of_week', 'period']),
+            models.Index(fields=['academic_year']),
+        ]
+        # Ensure no double booking for a section at same time
+        unique_together = [('school', 'section', 'day_of_week', 'period', 'academic_year')]
+
+    def __str__(self):
+        return f"{self.day_of_week} ({self.period}) - {self.subject} ({self.section})"
+
+    def clean(self):
+        """
+        Validate data integrity and business rules.
+        """
+        from django.core.exceptions import ValidationError
+
+        # 1. Tenant Isolation
+        if self.section.school_id != self.school_id:
+            raise ValidationError("Section does not belong to the school.")
+        if self.period.school_id != self.school_id:
+            raise ValidationError("Period does not belong to the school.")
+        if self.subject.school_id != self.school_id:
+            raise ValidationError("Subject does not belong to the school.")
+        if self.teacher.user.school_id != self.school_id:
+            raise ValidationError("Teacher does not belong to the school.")
+
+        # 2. Check if period is a break
+        if self.period.is_break:
+            raise ValidationError("Cannot assign class during a break period.")
+
+        # 3. Check Teacher Availability (Conflict Detection)
+        # We need to ensure this teacher isn't assigned to ANOTHER section at the same day + period + year
+        teacher_conflict = TimetableEntry.objects.filter(
+            school=self.school_id,
+            teacher=self.teacher,
+            day_of_week=self.day_of_week,
+            period=self.period,
+            academic_year=self.academic_year
+        ).exclude(pk=self.pk).exists()
+
+        if teacher_conflict:
+            raise ValidationError(f"Teacher {self.teacher.user.get_full_name()} is already assigned to another class for this period.")

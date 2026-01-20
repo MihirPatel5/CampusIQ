@@ -1,7 +1,21 @@
 from rest_framework import serializers
-from .models import StudentProfile, ParentProfile
+from .models import StudentProfile, ParentProfile, AdmissionFormConfig
 from academic.models import Class, Section
 from accounts.models import User
+
+
+class AdmissionFormConfigSerializer(serializers.ModelSerializer):
+    """Serializer for AdmissionFormConfig"""
+    
+    class Meta:
+        model = AdmissionFormConfig
+        fields = [
+            'id', 'field_name', 'field_label', 'field_type', 'section',
+            'is_visible', 'is_required', 'display_order', 'help_text',
+            'placeholder', 'options', 'validation_rules',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class ParentProfileSerializer(serializers.ModelSerializer):
@@ -22,11 +36,18 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
         fields = [
-            'id', 'admission_number', 'first_name', 'last_name', 'full_name',
-            'date_of_birth', 'gender', 'blood_group', 'aadhaar_number',
-            'email', 'phone', 'address', 'city', 'state', 'pincode',
-            'admission_date', 'class_obj', 'class_name', 'section', 'section_name',
-            'previous_school', 'previous_class', 'status', 'parents',
+            'id', 'admission_number', 'first_name', 'middle_name', 'last_name', 'full_name',
+            'date_of_birth', 'gender', 'blood_group', 'nationality', 'religion', 'category',
+            'mother_tongue', 'caste', 'aadhaar_number',
+            'email', 'phone', 'alternate_phone', 'address', 'city', 'state', 'pincode',
+            'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation',
+            'height', 'weight', 'medical_conditions', 'allergies', 'vaccination_status',
+            'admission_date', 'roll_number', 'class_obj', 'class_name', 'section', 'section_name',
+            'previous_school', 'previous_class', 'previous_marks', 'tc_number', 'tc_date',
+            'photo', 'birth_certificate', 'transfer_certificate', 'aadhar_card', 'caste_certificate',
+            'transport_required', 'bus_route', 'pickup_point',
+            'hostel_required', 'hostel_room_preference',
+            'custom_fields', 'status', 'parents',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
@@ -36,18 +57,25 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
 
 class StudentAdmissionSerializer(serializers.ModelSerializer):
-    """Serializer for student admission with parent details"""
+    """Serializer for student admission with parent details and dynamic validation"""
     parents = ParentProfileSerializer(many=True, required=False)
     password = serializers.CharField(write_only=True, required=False)
     
     class Meta:
         model = StudentProfile
         fields = [
-            'id', 'admission_number', 'first_name', 'last_name', 'date_of_birth',
-            'gender', 'blood_group', 'aadhaar_number', 'email', 'phone',
-            'address', 'city', 'state', 'pincode', 'admission_date',
-            'class_obj', 'section', 'previous_school', 'previous_class',
-            'parents', 'password'
+            'id', 'admission_number', 'first_name', 'middle_name', 'last_name', 'date_of_birth',
+            'gender', 'blood_group', 'nationality', 'religion', 'category', 'mother_tongue', 'caste',
+            'aadhaar_number', 'email', 'phone', 'alternate_phone',
+            'address', 'city', 'state', 'pincode',
+            'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation',
+            'height', 'weight', 'medical_conditions', 'allergies', 'vaccination_status',
+            'admission_date', 'roll_number', 'class_obj', 'section',
+            'previous_school', 'previous_class', 'previous_marks', 'tc_number', 'tc_date',
+            'photo', 'birth_certificate', 'transfer_certificate', 'aadhar_card', 'caste_certificate',
+            'transport_required', 'bus_route', 'pickup_point',
+            'hostel_required', 'hostel_room_preference',
+            'custom_fields', 'parents', 'password'
         ]
         read_only_fields = ['id']
     
@@ -71,6 +99,32 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
         section = attrs.get('section')
         if section and not section.has_capacity():
             raise serializers.ValidationError({"section": "Section has reached maximum capacity"})
+        
+        # Dynamic validation based on school's form configuration
+        request = self.context.get('request')
+        if request and request.user and request.user.school:
+            school = request.user.school
+            required_fields = AdmissionFormConfig.objects.filter(
+                school=school,
+                is_required=True,
+                is_visible=True
+            ).values_list('field_name', flat=True)
+            
+            for field_name in required_fields:
+                if field_name in ['class_obj', 'section']:  # These are ForeignKeys, handled differently
+                    continue
+                if field_name not in attrs or not attrs.get(field_name):
+                    # Get field label for better error message
+                    try:
+                        config = AdmissionFormConfig.objects.get(school=school, field_name=field_name)
+                        field_label = config.field_label
+                    except AdmissionFormConfig.DoesNotExist:
+                        field_label = field_name.replace('_', ' ').title()
+                    
+                    raise serializers.ValidationError({
+                        field_name: f"{field_label} is required for this school"
+                    })
+        
         return attrs
     
     def create(self, validated_data):
@@ -117,17 +171,13 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
             p_phone = parent_data.get('phone')
             
             # Create parent user if email/phone exists
-            # Strategy: Username = 'P' + Phone (unique enough for school level?) or just use email
-            # For now, let's use email as username if present, else P+Phone
             if p_email or p_phone:
                 p_username = p_email if p_email else f"P{p_phone}"
-                # Check if user exists? For now assume new or handle error
-                # In real world, we might link existing user. Here, create new.
                 try:
                     parent_user = User.objects.create_user(
                         username=p_username,
                         email=p_email if p_email else '',
-                        password=password, # Share same password or default? User said "provide credntial", let's use same for simplicity/demo
+                        password=password,
                         first_name=parent_data.get('name', '').split(' ')[0],
                         last_name=parent_data.get('name', '').split(' ')[-1] if ' ' in parent_data.get('name', '') else '',
                         role='parent',
@@ -135,9 +185,6 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
                         created_by=created_by
                     )
                 except Exception as e:
-                    # If user exists, maybe skip user creation and just link? 
-                    # For verification script predictability, we'll log/ignore collision for now
-                    # checking context for logger is good practice but print for now
                     print(f"Warning: Could not create parent user: {e}")
             
             ParentProfile.objects.create(
