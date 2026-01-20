@@ -1,5 +1,5 @@
 import api from './api'
-import { API_ENDPOINTS } from '@/config'
+
 import type { Period, TimetableEntry } from '@/types'
 
 // Ensure these endpoints exist in your config or define them here if not yet.

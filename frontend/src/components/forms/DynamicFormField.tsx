@@ -61,7 +61,7 @@ export function DynamicFormField({ config, value, onChange, error }: DynamicForm
                         id={field_name}
                         placeholder={placeholder}
                         value={value || ''}
-                        onChange={(e) => onChange(e.target.value)}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value)}
                         className={error ? 'border-destructive' : ''}
                         rows={3}
                     />

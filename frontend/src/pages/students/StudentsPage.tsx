@@ -102,7 +102,7 @@ export default function StudentsPage() {
   const onSubmit = async (data: any) => {
     // Validate required fields based on form config
     let hasErrors = false
-    Object.entries(formConfig).forEach(([section, fields]) => {
+    Object.entries(formConfig).forEach(([_section, fields]) => {
       fields.forEach((config: AdmissionFormConfig) => {
         if (config.is_visible && config.is_required) {
           const value = data[config.field_name]

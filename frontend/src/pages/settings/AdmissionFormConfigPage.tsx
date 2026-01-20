@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Settings, Eye, EyeOff, CheckSquare, Square, Loader2, RotateCcw, Save, GripVertical } from 'lucide-react'
+import { Settings, Eye, EyeOff, CheckSquare, Square, Loader2, RotateCcw, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { studentService } from '@/services/studentService'
 import { getErrorMessage } from '@/services/api'
@@ -40,7 +40,7 @@ export default function AdmissionFormConfigPage() {
     const [formConfig, setFormConfig] = useState<GroupedFormConfig>({})
     const [isLoading, setIsLoading] = useState(true)
     const [isSaving, setIsSaving] = useState(false)
-    const [hasChanges, setHasChanges] = useState(false)
+
     const [activeSection, setActiveSection] = useState('basic')
 
     useEffect(() => {
@@ -52,7 +52,7 @@ export default function AdmissionFormConfigPage() {
         try {
             const data = await studentService.getFormConfigBySection()
             setFormConfig(data)
-            setHasChanges(false)
+
         } catch (error) {
             toast.error(getErrorMessage(error))
         } finally {

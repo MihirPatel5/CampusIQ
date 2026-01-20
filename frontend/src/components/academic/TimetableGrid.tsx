@@ -1,4 +1,4 @@
-import { Card } from '@/components/ui/card'
+
 import { LoadingScreen } from '@/components/ui/loading-screen'
 import type { Period, TimetableEntry } from '@/types'
 import { Plus } from 'lucide-react'

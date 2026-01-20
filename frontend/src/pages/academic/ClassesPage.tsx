@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Layers, Loader2, MoreVertical, Edit, Trash2, Calendar, Code, User, BookOpen } from 'lucide-react'
+import { Plus, Layers, Loader2, MoreVertical, Edit, Trash2, Calendar, Code } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -40,7 +40,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ScrollArea } from "@/components/ui/scroll-area"
+
 
 const classSchema = z.object({
     name: z.string().min(1, 'Class name is required'),
@@ -69,7 +69,6 @@ export default function ClassesPage() {
         control,
         handleSubmit,
         reset,
-        watch,
         setValue,
         formState: { errors },
     } = useForm<ClassFormData>({
@@ -123,8 +122,7 @@ export default function ClassesPage() {
 
     const fetchTeachers = async () => {
         try {
-            const response = await teacherService.getTeachers()
-            const data = Array.isArray(response) ? response : response.results
+            const data = await teacherService.getTeachers()
             setTeachers(data)
         } catch (error) {
             console.error('Failed to fetch teachers', error)
