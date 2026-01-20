@@ -11,8 +11,7 @@ import {
   Clock,
   Loader2,
   Building2,
-  Calendar,
-  BookOpen
+  Calendar
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
@@ -103,8 +102,7 @@ export default function TeachersPage() {
   const fetchTeachers = async () => {
     setIsLoading(true)
     try {
-      const response = await teacherService.getTeachers()
-      const data = Array.isArray(response) ? response : response.results
+      const data = await teacherService.getTeachers()
       setTeachers(data)
     } catch (error) {
       toast.error(getErrorMessage(error))
