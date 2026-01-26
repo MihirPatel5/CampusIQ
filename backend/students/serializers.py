@@ -75,7 +75,8 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
             'photo', 'birth_certificate', 'transfer_certificate', 'aadhar_card', 'caste_certificate',
             'transport_required', 'bus_route', 'pickup_point',
             'hostel_required', 'hostel_room_preference',
-            'custom_fields', 'parents', 'password'
+            'hostel_required', 'hostel_room_preference',
+            'custom_fields', 'parents', 'password', 'school'
         ]
         read_only_fields = ['id']
     
@@ -102,8 +103,12 @@ class StudentAdmissionSerializer(serializers.ModelSerializer):
         
         # Dynamic validation based on school's form configuration
         request = self.context.get('request')
-        if request and request.user and request.user.school:
+        school = attrs.get('school')
+        
+        if not school and request and request.user and hasattr(request.user, 'school'):
             school = request.user.school
+            
+        if school:
             required_fields = AdmissionFormConfig.objects.filter(
                 school=school,
                 is_required=True,

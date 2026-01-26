@@ -29,10 +29,21 @@ class AdmissionFormConfigViewSet(TenantMixin, viewsets.ModelViewSet):
         """Reset form configuration to defaults"""
         from django.core.management import call_command
         
-        school = request.user.school
+        school = None
+        if hasattr(request.user, 'school') and request.user.school:
+            school = request.user.school
+        else:
+            school_id = request.data.get('school') or request.query_params.get('school_id')
+            if school_id:
+                from accounts.models import School
+                try:
+                    school = School.objects.get(pk=school_id)
+                except School.DoesNotExist:
+                    pass
+        
         if not school:
             return Response(
-                {'error': 'No school associated with user'},
+                {'error': 'School is required. Provide school_id if super admin.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -47,7 +58,7 @@ class AdmissionFormConfigViewSet(TenantMixin, viewsets.ModelViewSet):
             'count': AdmissionFormConfig.objects.filter(school=school).count()
         })
     
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='by-section')
     def by_section(self, request):
         """Get form configuration grouped by section"""
         configs = self.get_queryset()

@@ -4,7 +4,7 @@ from .views import StudentViewSet, AdmissionFormConfigViewSet
 
 router = DefaultRouter()
 router.register(r'students', StudentViewSet, basename='student')
-router.register(r'admission-form-config', AdmissionFormConfigViewSet, basename='admission-form-config')
+router.register(r'students/admission-form-config', AdmissionFormConfigViewSet, basename='admission-form-config')
 
 urlpatterns = [
     path('', include(router.urls)),
