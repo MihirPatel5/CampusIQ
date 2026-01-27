@@ -248,6 +248,7 @@ class SchoolAdminRegistrationSerializer(serializers.ModelSerializer):
     """Serializer for school admin self-registration"""
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True, required=True)
+    phone = serializers.CharField(required=False, write_only=True)  # Optional phone, not saved to User
     
     class Meta:
         model = User
@@ -265,6 +266,7 @@ class SchoolAdminRegistrationSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password_confirm')
+        validated_data.pop('phone', None)  # Remove phone if present, not on User model
         password = validated_data.pop('password')
         
         user = User.objects.create_user(

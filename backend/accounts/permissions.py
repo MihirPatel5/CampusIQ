@@ -2,10 +2,27 @@ from rest_framework import permissions
 
 
 class IsSuperAdmin(permissions.BasePermission):
-    """Permission class for super-admin only access"""
+    """Permission class for super admin only"""
+    message = "Only super admins can access this resource."
     
     def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.role == 'super_admin'
+        return request.user and request.user.is_authenticated and request.user.is_super_admin()
+
+
+class HasSchool(permissions.BasePermission):
+    """
+    Permission class ensuring user is associated with a school.
+    Super admins are exempt from this requirement.
+    """
+    message = "You must create or be associated with a school to access this resource."
+    
+    def has_permission(self, request, view):
+        # Super admins don't need a school
+        if request.user.is_super_admin():
+            return True
+        
+        # All other users must have a school
+        return request.user.school is not None
 
 
 class IsAdmin(permissions.BasePermission):

@@ -22,6 +22,12 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />
   }
 
+  // Redirect school admins without a school to onboarding
+  // (unless they're already on the onboarding page)
+  if (user && user.role === 'admin' && !user.school && location.pathname !== '/schools/onboard') {
+    return <Navigate to="/schools/onboard" replace />
+  }
+
   // Check role-based access
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return (

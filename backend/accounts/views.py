@@ -457,10 +457,21 @@ def create_own_school(request):
     
     # Security checks
     if user.role != 'admin':
-        return Response({'error': 'Only admins can create schools through this flow'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({
+            'error': 'Only admins can create schools through this flow'
+        }, status=status.HTTP_403_FORBIDDEN)
         
     if user.school:
-        return Response({'error': 'You are already associated with a school'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            'error': 'You are already associated with a school',
+            'school': SchoolSerializer(user.school).data
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Ensure email is verified
+    if not user.is_email_verified:
+        return Response({
+            'error': 'Email must be verified before creating a school'
+        }, status=status.HTTP_403_FORBIDDEN)
         
     serializer = SchoolOnboardingSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():

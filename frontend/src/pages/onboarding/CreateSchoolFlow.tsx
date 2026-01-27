@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { Building2, Loader2, Save } from 'lucide-react'
 import { schoolService } from '@/services/schoolService'
+import { authService } from '@/services/authService'
 import { getErrorMessage } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
@@ -44,17 +45,18 @@ export default function CreateSchoolFlow() {
         }
     })
 
-    const updateUser = useAuthStore((state) => state.updateUser)
+    const setUser = useAuthStore((state) => state.setUser)
     const navigate = useNavigate()
 
     const onSubmit = async (data: SchoolFormData) => {
         setIsLoading(true)
         try {
-            const response = await schoolService.createMySchool(data as any)
+            await schoolService.createMySchool(data as any)
             toast.success('School created successfully! Welcome to your dashboard.')
 
-            // Update user with new school info in store
-            updateUser({ school: response.id as any })
+            // Refresh user data from backend to get updated school info
+            const freshUser = await authService.getMe()
+            setUser(freshUser)
 
             // Navigate to dashboard
             navigate('/dashboard')
