@@ -374,13 +374,17 @@ from core.services.email_service import send_otp_email
 def register_school_admin(request):
     """
     Step 1: Register new school admin (inactive) and send OTP
+    
+    NOTE: Email sending is temporarily disabled. Users are auto-verified.
+    TODO: Re-enable email when SendGrid API is configured.
     """
     serializer = SchoolAdminRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         
         # Generate 6-digit OTP
-        otp_code = ''.join(random.choices(string.digits, k=6))
+        otp_code = '123456'  # Fixed OTP for testing (TODO: randomize when email works)
+        # otp_code = ''.join(random.choices(string.digits, k=6))
         
         # Save OTP
         OTPVerification.objects.create(
@@ -389,16 +393,22 @@ def register_school_admin(request):
             expires_at=timezone.now() + timedelta(minutes=10)
         )
         
-        # Send Email
-        try:
-            send_otp_email(user.email, otp_code, user.first_name)
-        except Exception as e:
-            # If email fails, shouldn't rollback user but might need handling
-            print(f"Failed to send email: {e}")
+        # ===== EMAIL SENDING DISABLED =====
+        # TODO: Uncomment when SendGrid is configured
+        # try:
+        #     send_otp_email(user.email, otp_code, user.first_name)
+        # except Exception as e:
+        #     print(f"Failed to send email: {e}")
+        
+        # TEMPORARY: Auto-activate user (bypass email verification)
+        user.is_active = True
+        user.is_email_verified = True
+        user.save()
         
         return Response({
-            'message': 'Registration successful. Please verify your email.',
-            'email': user.email
+            'message': 'Registration successful. Use OTP: 123456 to verify.',
+            'email': user.email,
+            'otp': otp_code  # Only for development!
         }, status=status.HTTP_201_CREATED)
         
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
