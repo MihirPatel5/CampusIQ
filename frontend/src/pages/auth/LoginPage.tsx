@@ -44,7 +44,7 @@ export default function LoginPage() {
     setIsLoading(true)
     try {
       const response = await authService.login(data)
-      
+
       login(response.user, {
         access: response.access,
         refresh: response.refresh,
@@ -138,12 +138,23 @@ export default function LoginPage() {
 
 
       {/* Footer */}
-      <p className="text-center text-sm text-muted-foreground">
-        Don't have an account?{' '}
-        <Link to="/register/teacher" className="text-primary hover:underline font-medium">
-          Register as Teacher
-        </Link>
-      </p>
+      <div className="space-y-4 pt-6 border-t border-border/50">
+        <p className="text-center text-sm text-muted-foreground font-medium">
+          New to CampusIQ?
+        </p>
+        <div className="flex flex-col gap-3">
+          <Button asChild variant="outline" className="w-full">
+            <Link to="/register-admin">
+              Register your School
+            </Link>
+          </Button>
+          <div className="text-center">
+            <Link to="/register/teacher" className="text-sm text-primary hover:underline">
+              Register as Teacher
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

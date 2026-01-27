@@ -201,12 +201,17 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF Configuration
+_csrf_origins = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001',
     'http://localhost:3002',
-]
+] + [origin for origin in _csrf_origins if origin]
+
+# Optional: Add common patterns for dev
+if DEBUG:
+    CSRF_TRUSTED_ORIGINS += ['https://*.vercel.app', 'https://*.ngrok-free.app']
 
 # API Documentation (drf-spectacular)
 SPECTACULAR_SETTINGS = {
