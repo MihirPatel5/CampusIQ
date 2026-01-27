@@ -1,0 +1,44 @@
+name: Deploy Frontend to S3
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build project
+        run: |
+          cd frontend
+          export VITE_API_BASE_URL=http://${{ secrets.EC2_HOST }}:8000/api/v1
+          npm run build
+
+      - name: Deploy to S3
+        uses: jakejarvis/s3-sync-action@master
+        with:
+          args: --follow-symlinks --delete
+        env:
+          AWS_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: 'ap-southeast-2' # Adjust if different
+          SOURCE_DIR: 'frontend/dist'

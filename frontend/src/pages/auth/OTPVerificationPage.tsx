@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Loader2, ShieldCheck, ArrowLeft } from 'lucide-react'
 import { authService } from '@/services/authService'
 import { getErrorMessage } from '@/services/api'
+import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -44,20 +45,22 @@ export default function OTPVerificationPage() {
         }
     }, [email, navigate])
 
+    const login = useAuthStore((state) => state.login)
+
     const onSubmit = async (data: OTPFormData) => {
         setIsLoading(true)
         try {
             const response = await authService.verifyOTP(email, data.otp)
             toast.success('Email verified successfully!')
 
-            // Store tokens
-            localStorage.setItem('access_token', response.access)
-            localStorage.setItem('refresh_token', response.refresh)
+            // Authenticate in store
+            login(response.user, {
+                access: response.access,
+                refresh: response.refresh,
+            })
 
-            // Force page reload to trigger AuthProvider hydration or redirect to onboarding
-            // Ideally we should use a method from AuthProvider to set user state without reload
-            // But reloading is a safe way to ensure everything re-syncs
-            window.location.href = '/onboarding/create-school'
+            // Navigate to onboarding
+            navigate('/schools/onboard')
 
         } catch (error) {
             toast.error(getErrorMessage(error))
