@@ -9,8 +9,8 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'school_erp.settings')
 django.setup()
 
-from accounts.models import School, User
-from academic.models import Class, Section, Subject
+from accounts.models import School, User, TeacherProfile
+from academic.models import Class, Section, Subject, SubjectAssignment
 from students.models import StudentProfile
 from datetime import date, timedelta
 import random
@@ -133,7 +133,83 @@ def seed_demo_data():
     total_subjects = Subject.objects.filter(school=school).count()
     print(f"✓ Subjects: {total_subjects} total ({subjects_created} newly created)")
     
-    # 6. Create Sample Students
+    # 6. Create Teachers
+    teachers_created = 0
+    teacher_first_names = ['Rajesh', 'Suman', 'Vikram', 'Pooja', 'Amit', 'Neha', 'Sanjay', 'Meena', 'Deepak', 'Kavita']
+    teacher_last_names = ['Sharma', 'Verma', 'Gupta', 'Singh', 'Patel', 'Joshi', 'Reddy', 'Rao', 'Mehta', 'Kumar']
+    
+    teachers = []
+    for i in range(10):
+        username = f'teacher{i+1}'
+        first_name = teacher_first_names[i]
+        last_name = teacher_last_names[i]
+        
+        user, created = User.objects.get_or_create(
+            username=username,
+            defaults={
+                'email': f'{username}@{school.code.lower()}.edu',
+                'first_name': first_name,
+                'last_name': last_name,
+                'role': 'teacher',
+                'school': school,
+                'is_active': True,
+                'is_email_verified': True
+            }
+        )
+        
+        if created:
+            user.set_password('Teacher@123')
+            user.save()
+            
+        teacher, created = TeacherProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                'phone': f'+91-987654321{i}',
+                'joining_date': date(2023, 1, 1),
+                'qualification': 'MA, B.Ed',
+                'specialization': random.choice(['Mathematics', 'Science', 'English', 'Social Studies']),
+                'status': 'active'
+            }
+        )
+        if created:
+            teachers_created += 1
+        teachers.append(teacher)
+        
+    total_teachers = TeacherProfile.objects.filter(user__school=school).count()
+    print(f"✓ Teachers: {total_teachers} total ({teachers_created} newly created)")
+
+    # 7. Assign Class Teachers and Subject Assignments
+    assignments_created = 0
+    all_subjects = list(Subject.objects.filter(school=school))
+    all_sections = list(Section.objects.filter(school=school))
+    
+    # Assign class teachers to some sections
+    for i, section in enumerate(all_sections[:10]):
+        if i < len(teachers):
+            section.class_teacher = teachers[i]
+            section.save()
+
+    # Create Subject Assignments
+    for section in all_sections[:5]: # Assign subjects for first 5 sections to keep it manageable
+        for subject in all_subjects:
+            teacher = random.choice(teachers)
+            assignment, created = SubjectAssignment.objects.get_or_create(
+                school=school,
+                class_obj=section.class_obj,
+                section=section,
+                subject=subject,
+                academic_year='2024-25',
+                defaults={
+                    'teacher': teacher,
+                    'status': 'active'
+                }
+            )
+            if created:
+                assignments_created += 1
+                
+    print(f"✓ Subject Assignments: {assignments_created} newly created")
+
+    # 8. Create Sample Students
     students_created = 0
     first_names = ['Aarav', 'Vivaan', 'Aditya', 'Arjun', 'Sai', 'Ananya', 'Diya', 'Isha', 'Priya', 'Riya']
     last_names = ['Sharma', 'Patel', 'Kumar', 'Singh', 'Reddy', 'Gupta', 'Verma', 'Joshi', 'Rao', 'Mehta']

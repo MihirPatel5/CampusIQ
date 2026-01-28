@@ -6,7 +6,7 @@ from accounts.models import TeacherProfile
 
 class ClassSerializer(serializers.ModelSerializer):
     """Serializer for Class model"""
-    sections = serializers.ListField(read_only=True) # or nested SectionSerializer but defined later. Using ListField for now or SerializeMethodField to avoid reference error.
+    sections = serializers.SerializerMethodField()
     # Actually, if SectionSerializer is defined later, I can use string reference 'SectionSerializer' if using PrimaryKeyRelated, but for nested it might be tricky.
     # But I can define SectionSerializer first or use 'SectionSerializer' string if DRF supports it (depends on version/setup).
     # Safer: Simple ListField for read_only or omit it if not critical to return immediately.
@@ -14,17 +14,30 @@ class ClassSerializer(serializers.ModelSerializer):
     # Let's use SerializerMethodField for read or just return minimal data.
     # For write, sections_data is what matters.
     
-    sections_data = serializers.ListField(
-        child=serializers.DictField(),
-        write_only=True,
-        required=False,
-        help_text="List of sections to create: [{'name': 'A', 'class_teacher': 1}, ...]"
-    )
+    class_teacher_name = serializers.CharField(source='class_teacher.user.get_full_name', read_only=True)
+    sections_data = serializers.JSONField(write_only=True, required=False)
     
     class Meta:
         model = Class
-        fields = ['id', 'name', 'code', 'academic_year', 'description', 'status', 'sections', 'sections_data', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'code', 'academic_year', 'description', 
+            'status', 'class_teacher', 'class_teacher_name', 
+            'sections', 'sections_data', 'created_at', 'updated_at'
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_sections(self, obj):
+        """Get all sections for this class with teacher and student count info"""
+        from .models import Section
+        sections = Section.objects.filter(class_obj=obj, school=obj.school)
+        return [{
+            'id': s.id, 
+            'name': s.name, 
+            'code': s.code,
+            'class_teacher': s.class_teacher.id if s.class_teacher else None,
+            'class_teacher_name': s.class_teacher.user.get_full_name() if s.class_teacher else None,
+            'current_strength': s.get_current_strength()
+        } for s in sections]
     
     def validate_code(self, value):
         # Check uniqueness for code + academic_year
@@ -57,17 +70,57 @@ class ClassSerializer(serializers.ModelSerializer):
                     try:
                         class_teacher = TeacherProfile.objects.get(pk=class_teacher_id)
                     except TeacherProfile.DoesNotExist:
-                        pass # Or raise error
+                        pass
                 
                 Section.objects.create(
                     class_obj=class_obj,
                     name=name,
                     code=code,
                     class_teacher=class_teacher,
-                    school=class_obj.school # Inherit school
+                    school=class_obj.school
                 )
         
         return class_obj
+
+    def update(self, instance, validated_data):
+        sections_data = validated_data.pop('sections_data', None)
+        
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            
+            if sections_data is not None:
+                # Add/Update sections
+                for section_item in sections_data:
+                    section_id = section_item.get('id')
+                    name = section_item.get('name')
+                    class_teacher_id = section_item.get('class_teacher')
+                    
+                    class_teacher = None
+                    if class_teacher_id:
+                        try:
+                            class_teacher = TeacherProfile.objects.get(pk=class_teacher_id)
+                        except TeacherProfile.DoesNotExist:
+                            pass
+                    
+                    if section_id:
+                        # Update existing
+                        Section.objects.filter(id=section_id, class_obj=instance).update(
+                            name=name,
+                            class_teacher=class_teacher,
+                            code=f"{instance.code}-{name}"
+                        )
+                    else:
+                        # Create new if doesn't exist
+                        Section.objects.get_or_create(
+                            class_obj=instance,
+                            name=name,
+                            defaults={
+                                'code': f"{instance.code}-{name}",
+                                'class_teacher': class_teacher,
+                                'school': instance.school
+                            }
+                        )
+        return instance
 
 
 class SectionSerializer(serializers.ModelSerializer):
@@ -88,6 +141,12 @@ class SectionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_current_strength(self, obj):
+        return obj.get_current_strength()
+    
+    def get_has_capacity(self, obj):
+        return obj.has_capacity()
+
+
 class SubjectSerializer(serializers.ModelSerializer):
     """Serializer for Subject model"""
     
@@ -109,7 +168,7 @@ class SubjectAssignmentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'class_obj', 'class_name', 'section', 'section_name',
             'subject', 'subject_name', 'teacher', 'teacher_name',
-            'academic_year', 'status', 'created_at', 'updated_at'
+            'academic_year', 'max_marks', 'status', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 

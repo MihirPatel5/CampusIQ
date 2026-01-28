@@ -56,10 +56,11 @@ class SchoolSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
     school = SchoolSerializer(read_only=True)
+    teacher_profile_id = serializers.IntegerField(source='teacher_profile.id', read_only=True, required=False)
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'school', 'is_active', 'date_joined']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'school', 'is_active', 'date_joined', 'teacher_profile_id']
         read_only_fields = ['id', 'date_joined']
 
 
@@ -144,17 +145,28 @@ class TeacherRegistrationSerializer(serializers.ModelSerializer):
         return teacher_profile
 
 
+from academic.models import Subject
+
 class TeacherProfileSerializer(serializers.ModelSerializer):
     """Serializer for TeacherProfile"""
     user = UserSerializer(read_only=True)
+    first_name = serializers.CharField(source='user.first_name', required=False)
+    last_name = serializers.CharField(source='user.last_name', required=False)
+    email = serializers.EmailField(source='user.email', required=False)
     full_name = serializers.SerializerMethodField()
+    subjects = serializers.PrimaryKeyRelatedField(
+        queryset=Subject.objects.all(),
+        many=True,
+        required=False
+    )
     
     class Meta:
         model = TeacherProfile
         fields = [
-            'id', 'user', 'full_name', 'employee_id', 'phone', 'date_of_birth',
-            'joining_date', 'qualification', 'specialization', 'address',
-            'status', 'self_registered', 'rejection_reason', 'subjects',
+            'id', 'user', 'first_name', 'last_name', 'email', 'full_name', 
+            'employee_id', 'phone', 'date_of_birth', 'joining_date', 
+            'qualification', 'specialization', 'address', 'status', 
+            'self_registered', 'rejection_reason', 'subjects',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'status', 'self_registered', 'created_at', 'updated_at']
@@ -162,8 +174,32 @@ class TeacherProfileSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         return obj.user.get_full_name()
 
+    def update(self, instance, validated_data):
+        # Extract user data if provided (dotted source fields create nested dict in validated_data)
+        user_data = validated_data.pop('user', {})
+        first_name = user_data.get('first_name')
+        last_name = user_data.get('last_name')
+        email = user_data.get('email')
+        
+        # Update user fields if any provided
+        if user_data:
+            user = instance.user
+            if first_name: user.first_name = first_name
+            if last_name: user.last_name = last_name
+            if email: user.email = email
+            user.save()
+            
+        # Update profile fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Update subjects
+        if subjects is not None:
+            instance.subjects.set(subjects)
+            
+        return instance
 
-from academic.models import Subject
 
 class TeacherCreateSerializer(serializers.ModelSerializer):
     """Serializer for admin creating teacher accounts"""

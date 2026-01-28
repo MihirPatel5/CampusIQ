@@ -13,6 +13,7 @@ export interface User {
   date_joined: string
   last_login?: string
   profile_picture?: string
+  teacher_profile_id?: number
 }
 
 export interface AuthTokens {
@@ -67,6 +68,9 @@ export interface Class {
   code: string
   academic_year: string
   description?: string
+  class_teacher?: number
+  class_teacher_name?: string
+  sections?: Section[]
   status: 'active' | 'inactive'
   created_at: string
 }
@@ -156,6 +160,7 @@ export interface TeacherRegistrationData {
   password: string
   password_confirm: string
   school_id: number
+  subjects?: number[]
 }
 
 // Student Types

@@ -52,6 +52,11 @@ export default function ExamsPage() {
     const [students, setStudents] = useState<any[]>([])
     const [isLoadingStudents, setIsLoadingStudents] = useState(false)
 
+    // For Report Card
+    const [reportCardData, setReportCardData] = useState<any>(null)
+    const [isReportCardOpen, setIsReportCardOpen] = useState(false)
+    const [isLoadingReport, setIsLoadingReport] = useState(false)
+
     useEffect(() => {
         fetchExams()
         fetchAcademicData()
@@ -142,6 +147,21 @@ export default function ExamsPage() {
             toast.error(getErrorMessage(error))
         } finally {
             setIsSaving(false)
+        }
+    }
+
+    const handleViewReportCard = async (studentId: number) => {
+        if (!selectedExamId) return
+
+        setIsLoadingReport(true)
+        try {
+            const data = await examService.getStudentReportCard(parseInt(selectedExamId), studentId)
+            setReportCardData(data)
+            setIsReportCardOpen(true)
+        } catch (error) {
+            toast.error(getErrorMessage(error))
+        } finally {
+            setIsLoadingReport(false)
         }
     }
 
@@ -382,6 +402,7 @@ export default function ExamsPage() {
                                             <th className="px-6 py-3 text-center w-32">Marks Obtained</th>
                                             <th className="px-6 py-3 text-center w-32">Max Marks</th>
                                             <th className="px-6 py-3 text-left">Remarks</th>
+                                            <th className="px-6 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
@@ -414,6 +435,18 @@ export default function ExamsPage() {
                                                         onChange={(e) => handleResultChange(s.id, 'remarks', e.target.value)}
                                                     />
                                                 </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleViewReportCard(s.id)}
+                                                        className="text-primary gap-2"
+                                                        disabled={isLoadingReport || !s.already_entered}
+                                                    >
+                                                        {isLoadingReport ? <Loader2 className="h-3 w-3 animate-spin" /> : <ClipboardList className="h-3 w-3" />}
+                                                        View Report
+                                                    </Button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -425,6 +458,100 @@ export default function ExamsPage() {
                     {isLoadingStudents && <div className="mt-8 space-y-4"><Skeleton className="h-64 w-full" /></div>}
                 </TabsContent>
             </Tabs>
+
+            {/* Report Card Modal */}
+            <Dialog open={isReportCardOpen} onOpenChange={setIsReportCardOpen}>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl text-center font-display border-b pb-4">
+                            Academic Report Card
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    {reportCardData && (
+                        <div className="space-y-6 py-4">
+                            {/* Student & Exam Info */}
+                            <div className="grid grid-cols-2 gap-8 text-sm bg-muted/30 p-4 rounded-xl border border-border/50">
+                                <div className="space-y-1">
+                                    <p className="text-muted-foreground">Student Name</p>
+                                    <p className="text-lg font-bold">{reportCardData.student.name}</p>
+                                    <p className="text-xs text-muted-foreground">Adm #: {reportCardData.student.admission_number}</p>
+                                </div>
+                                <div className="space-y-1 text-right">
+                                    <p className="text-muted-foreground">Exam Name</p>
+                                    <p className="text-lg font-bold">{reportCardData.exam.name}</p>
+                                    <p className="text-xs text-muted-foreground">{reportCardData.student.class} - {reportCardData.student.section}</p>
+                                </div>
+                            </div>
+
+                            {/* Marks Table */}
+                            <div className="border rounded-xl overflow-hidden shadow-sm">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-primary/5 border-b">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left">Subject</th>
+                                            <th className="px-4 py-3 text-center">Marks Obtained</th>
+                                            <th className="px-4 py-3 text-center">Max Marks</th>
+                                            <th className="px-4 py-3 text-center">Percentage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {reportCardData.results.map((res: any, idx: number) => (
+                                            <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                                                <td className="px-4 py-3 font-medium">{res.subject_name}</td>
+                                                <td className="px-4 py-3 text-center">{res.marks_obtained}</td>
+                                                <td className="px-4 py-3 text-center">{res.max_marks}</td>
+                                                <td className="px-4 py-3 text-center font-semibold">
+                                                    {((res.marks_obtained / res.max_marks) * 100).toFixed(1)}%
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot className="bg-muted/20 font-bold border-t">
+                                        <tr>
+                                            <td className="px-4 py-4">OVERALL TOTAL</td>
+                                            <td className="px-4 py-4 text-center text-primary text-lg">{reportCardData.marks_obtained}</td>
+                                            <td className="px-4 py-4 text-center">{reportCardData.total_marks}</td>
+                                            <td className="px-4 py-4 text-center text-primary text-lg">{reportCardData.percentage}%</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <Card className="border-border/50 shadow-none bg-primary/5">
+                                    <CardContent className="pt-6 text-center">
+                                        <div className="text-2xl font-black text-primary">{reportCardData.overall_grade}</div>
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Overall Grade</div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="border-border/50 shadow-none">
+                                    <CardContent className="pt-6 text-center">
+                                        <div className="text-2xl font-black">{reportCardData.marks_obtained} / {reportCardData.total_marks}</div>
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Total Aggregate</div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="border-border/50 shadow-none">
+                                    <CardContent className="pt-6 text-center">
+                                        <div className="text-2xl font-black text-success">
+                                            {reportCardData.percentage > 40 ? 'Passed' : 'Failed'}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground uppercase tracking-wider font-bold">Result Status</div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="border-t pt-4">
+                        <Button variant="outline" onClick={() => window.print()} className="gap-2">
+                            <ClipboardList className="h-4 w-4" /> Print Report
+                        </Button>
+                        <Button onClick={() => setIsReportCardOpen(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

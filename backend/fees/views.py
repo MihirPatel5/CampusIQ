@@ -177,7 +177,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
             pass
         # School admin/Teacher/Parent sees only their school's payments
         elif user.school:
-            queryset = queryset.filter(school=user.school)
+            queryset = queryset.filter(invoice__school=user.school)
         else:
             queryset = queryset.none()
         

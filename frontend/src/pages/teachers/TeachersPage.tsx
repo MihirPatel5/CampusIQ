@@ -11,7 +11,9 @@ import {
   Clock,
   Loader2,
   Building2,
-  Calendar
+  Calendar,
+  MoreVertical,
+  Edit
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
@@ -43,7 +45,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from '@/components/ui/label'
-import { ScrollArea } from "@/components/ui/scroll-area"
 
 const teacherSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
@@ -52,10 +53,10 @@ const teacherSchema = z.object({
   phone: z.string().min(10, 'Phone number must be at least 10 digits'),
   qualification: z.string().min(1, 'Qualification is required'),
   specialization: z.string().optional(),
-  date_of_birth: z.string().optional(), // Adjust if date object
+  date_of_birth: z.string().optional(),
   joining_date: z.string().min(1, 'Joining date is required'),
   address: z.string().min(5, 'Address is required'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
   subjects: z.array(z.number()).optional()
 })
 
@@ -74,7 +75,8 @@ export default function TeachersPage() {
   const [rejectionReason, setRejectionReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Add Teacher Dialog State
+  // Add/Edit Teacher Dialog State
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null)
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -92,6 +94,38 @@ export default function TeachersPage() {
       subjects: []
     }
   })
+
+  useEffect(() => {
+    if (editingTeacher) {
+      reset({
+        first_name: editingTeacher.user.first_name,
+        last_name: editingTeacher.user.last_name,
+        email: editingTeacher.user.email,
+        phone: editingTeacher.phone,
+        qualification: editingTeacher.qualification,
+        specialization: editingTeacher.specialization || '',
+        // @ts-ignore
+        date_of_birth: editingTeacher.date_of_birth,
+        joining_date: editingTeacher.joining_date,
+        address: editingTeacher.address,
+        // @ts-ignore
+        subjects: editingTeacher.subjects || []
+      })
+    } else {
+      reset({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        qualification: '',
+        specialization: '',
+        date_of_birth: '',
+        joining_date: new Date().toISOString().split('T')[0],
+        address: '',
+        subjects: []
+      })
+    }
+  }, [editingTeacher, reset, isAddOpen])
 
   useEffect(() => {
     fetchTeachers()
@@ -159,10 +193,16 @@ export default function TeachersPage() {
   const onSubmit = async (data: TeacherFormData) => {
     setIsSaving(true)
     try {
-      await teacherService.createTeacher(data as any) // Type assertion if API expects specific shape
-      toast.success('Teacher account created successfully')
+      if (editingTeacher) {
+        // @ts-ignore
+        await teacherService.updateTeacher(editingTeacher.id, data)
+        toast.success('Teacher updated successfully')
+      } else {
+        await teacherService.createTeacher(data as any)
+        toast.success('Teacher created successfully')
+      }
       setIsAddOpen(false)
-      reset()
+      setEditingTeacher(null)
       fetchTeachers()
     } catch (error) {
       toast.error(getErrorMessage(error))
@@ -199,7 +239,10 @@ export default function TeachersPage() {
 
         <Dialog open={isAddOpen} onOpenChange={(open) => {
           setIsAddOpen(open)
-          if (!open) reset()
+          if (!open) {
+            setEditingTeacher(null)
+            reset()
+          }
         }}>
           <DialogTrigger asChild>
             <Button className="gap-2">
@@ -207,13 +250,16 @@ export default function TeachersPage() {
               Add Teacher
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Add New Teacher</DialogTitle>
-              <DialogDescription>Create a new teacher account and assign subjects.</DialogDescription>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+            <DialogHeader className="p-6 pb-2">
+              <DialogTitle>{editingTeacher ? 'Edit Teacher' : 'Add New Teacher'}</DialogTitle>
+              <DialogDescription>
+                {editingTeacher ? 'Update profile information for ' + editingTeacher.user.first_name : 'Create a new teacher account and assign subjects.'}
+              </DialogDescription>
             </DialogHeader>
-            <div className="flex-1 overflow-y-auto pr-2">
-              <form id="addTeacherForm" onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+
+            <div className="flex-1 overflow-y-auto px-6 py-2">
+              <form id="teacherForm" onSubmit={handleSubmit(onSubmit)} className="space-y-6 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="first_name">First Name</Label>
@@ -229,22 +275,24 @@ export default function TeachersPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">Email Address</Label>
                     <Input id="email" type="email" {...register('email')} />
                     {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
+                    <Label htmlFor="phone">Phone Number</Label>
                     <Input id="phone" {...register('phone')} />
                     {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input id="password" type="password" {...register('password')} />
-                  {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-                </div>
+                {!editingTeacher && (
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Login Password</Label>
+                    <Input id="password" type="password" {...register('password')} />
+                    {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -271,45 +319,44 @@ export default function TeachersPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
+                  <Label htmlFor="address">Full Address</Label>
                   <Input id="address" {...register('address')} />
                   {errors.address && <p className="text-xs text-destructive">{errors.address.message}</p>}
                 </div>
 
-                {/* Subjects Selection */}
-                <div className="space-y-2">
-                  <Label>Assign Subjects</Label>
-                  <ScrollArea className="h-32 w-full rounded-md border p-4">
-                    <div className="grid grid-cols-2 gap-2">
-                      {subjects.length > 0 ? subjects.map((subject) => (
-                        <div key={subject.id} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`subject-${subject.id}`}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            checked={selectedSubjects.includes(subject.id)}
-                            onChange={() => toggleSubject(subject.id)}
-                          />
-                          <label
-                            htmlFor={`subject-${subject.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {subject.name} <span className="text-xs text-muted-foreground">({subject.code})</span>
-                          </label>
-                        </div>
-                      )) : (
-                        <p className="text-sm text-muted-foreground col-span-2">No subjects found. Add subjects in Academic section first.</p>
-                      )}
-                    </div>
-                  </ScrollArea>
+                <div className="space-y-3 pt-4 border-t">
+                  <Label className="text-base font-semibold">Assign Subjects</Label>
+                  <div className="grid grid-cols-2 gap-3 p-1">
+                    {subjects.map((subject) => (
+                      <div key={subject.id} className="flex items-center space-x-2 bg-muted/30 p-2 rounded-md border border-border/50">
+                        <input
+                          type="checkbox"
+                          id={`subject-${subject.id}`}
+                          className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          checked={selectedSubjects.includes(subject.id)}
+                          onChange={() => toggleSubject(subject.id)}
+                        />
+                        <label
+                          htmlFor={`subject-${subject.id}`}
+                          className="text-sm font-medium leading-none cursor-pointer"
+                        >
+                          {subject.name}
+                        </label>
+                      </div>
+                    ))}
+                    {subjects.length === 0 && (
+                      <p className="text-xs text-muted-foreground col-span-2 text-center py-4">No subjects found. Create subjects in Subjects page first.</p>
+                    )}
+                  </div>
                 </div>
               </form>
             </div>
-            <DialogFooter className="pt-4 border-t">
+
+            <DialogFooter className="p-6 pt-4 border-t bg-muted/20">
               <Button variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-              <Button type="submit" form="addTeacherForm" disabled={isSaving}>
+              <Button type="submit" form="teacherForm" disabled={isSaving}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Account
+                {editingTeacher ? 'Save Changes' : 'Create Teacher'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -332,11 +379,11 @@ export default function TeachersPage() {
 
         <TabsContent value="all" className="space-y-4">
           <Card>
-            <CardContent className="p-4">
-              <div className="relative max-w-sm">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="relative max-w-sm flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search staff..."
+                  placeholder="Search by name, email or ID..."
                   className="pl-9"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -361,57 +408,71 @@ export default function TeachersPage() {
               ))
             ) : filteredTeachers.length > 0 ? (
               filteredTeachers.map((teacher) => (
-                <Card key={teacher.id} className="hover:border-primary/50 transition-colors">
+                <Card key={teacher.id} className="hover:border-primary/50 transition-all group border-border/60 hover:shadow-md">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                        <GraduationCap className="h-5 w-5" />
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                        <GraduationCap className="h-6 w-6" />
                       </div>
                       <div>
                         <CardTitle className="text-lg font-bold">
                           {teacher.user.first_name} {teacher.user.last_name}
                         </CardTitle>
-                        <CardDescription>{teacher.employee_id || 'ID Pending'}</CardDescription>
+                        <CardDescription className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="text-[10px] uppercase py-0 px-1 font-mono">
+                            {teacher.employee_id || 'TEMP-ID'}
+                          </Badge>
+                        </CardDescription>
                       </div>
                     </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => {
+                          setEditingTeacher(teacher)
+                          setIsAddOpen(true)
+                        }}>
+                          <Edit className="mr-2 h-4 w-4" /> Edit Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive">
+                          <XCircle className="mr-2 h-4 w-4" /> Mark Inactive
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-4">
                     <div className="space-y-2 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
-                        <Mail className="h-3.5 w-3.5" />
-                        <span>{teacher.user.email}</span>
+                        <Mail className="h-3.5 w-3.5 text-primary" />
+                        <span className="truncate">{teacher.user.email}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Phone className="h-3.5 w-3.5" />
+                        <Phone className="h-3.5 w-3.5 text-primary" />
                         <span>{teacher.phone}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Building2 className="h-3.5 w-3.5" />
-                        <span>{teacher.specialization || teacher.qualification}</span>
+                        <Building2 className="h-3.5 w-3.5 text-primary" />
+                        <span className="truncate font-medium text-foreground">{teacher.specialization || teacher.qualification}</span>
                       </div>
-                      {/* Show Subjects if any */}
-                      {/* Note: Teacher interface might not have subjects populated fully yet unless backend sends it. Use optional chaining */}
                     </div>
                   </CardContent>
-                  <CardFooter className="bg-muted/30 border-t pt-4 text-xs flex justify-between">
-                    <span>Joined {new Date(teacher.joining_date).toLocaleDateString()}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs">Actions</Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Profile</DropdownMenuItem>
-                        <DropdownMenuItem>Edit Details</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Mark Inactive</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  <CardFooter className="bg-muted/20 border-t pt-4 text-[10px] flex justify-between items-center text-muted-foreground">
+                    <span>Joined: {new Date(teacher.joining_date).toLocaleDateString()}</span>
+                    <Badge variant="secondary" className="h-4 text-[9px] px-1 bg-green-500/10 text-green-600 hover:bg-green-500/20 border-green-500/20">
+                      Active
+                    </Badge>
                   </CardFooter>
                 </Card>
               ))
             ) : (
-              <div className="col-span-full py-12 text-center bg-muted/20 rounded-xl border-2 border-dashed border-border/50">
-                <h3 className="text-lg font-medium">No active teachers found</h3>
-                <p className="text-muted-foreground mt-1">Try searching for someone else.</p>
+              <div className="col-span-full py-20 text-center bg-muted/10 rounded-2xl border-2 border-dashed border-border/40">
+                <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
+                <h3 className="text-lg font-medium">No results matched your search</h3>
+                <p className="text-muted-foreground mt-1">Try refining your search terms.</p>
               </div>
             )}
           </div>
@@ -425,20 +486,20 @@ export default function TeachersPage() {
                   <CardContent className="p-6">
                     <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
+                        <div className="w-14 h-14 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 shadow-sm border border-orange-200">
                           <User className="w-8 h-8" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-bold">
+                          <h3 className="text-xl font-bold">
                             {teacher.user.first_name} {teacher.user.last_name}
                           </h3>
-                          <p className="text-sm text-muted-foreground">{teacher.user.email}</p>
-                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <GraduationCap className="w-3 h-3" /> {teacher.qualification}
+                          <p className="text-sm text-muted-foreground font-medium">{teacher.user.email}</p>
+                          <div className="flex items-center gap-4 mt-2 text-[11px] text-muted-foreground uppercase font-bold tracking-tight">
+                            <span className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border">
+                              <GraduationCap className="w-3 h-3 text-orange-500" /> {teacher.qualification}
                             </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" /> {new Date(teacher.created_at || '').toLocaleDateString()}
+                            <span className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border">
+                              <Calendar className="w-3 h-3 text-orange-500" /> {new Date(teacher.created_at || '').toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -447,16 +508,16 @@ export default function TeachersPage() {
                       <div className="flex items-center gap-3 w-full md:w-auto">
                         <Button
                           variant="outline"
-                          className="flex-1 md:flex-none border-destructive text-destructive hover:bg-destructive/10"
+                          className="flex-1 md:flex-none border-destructive/30 text-destructive hover:bg-destructive/5"
                           onClick={() => setRejectionId(teacher.id)}
                         >
                           <XCircle className="w-4 h-4 mr-2" /> Reject
                         </Button>
                         <Button
-                          className="flex-1 md:flex-none bg-green-600 hover:bg-green-700"
+                          className="flex-1 md:flex-none bg-green-600 hover:bg-green-700 shadow-md"
                           onClick={() => handleApprove(teacher.id)}
                         >
-                          <CheckCircle2 className="w-4 h-4 mr-2" /> Approve
+                          <CheckCircle2 className="w-4 h-4 mr-2" /> Approve Request
                         </Button>
                       </div>
                     </div>
@@ -465,10 +526,10 @@ export default function TeachersPage() {
               ))}
             </div>
           ) : (
-            <div className="py-20 text-center bg-muted/20 rounded-xl border-2 border-dashed border-border/50">
-              <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-medium">No pending requests</h3>
-              <p className="text-muted-foreground mt-1">Pending registrations will appear here for your review.</p>
+            <div className="py-24 text-center bg-muted/10 rounded-2xl border-2 border-dashed border-border/40">
+              <Clock className="h-14 w-14 text-muted-foreground mx-auto mb-4 opacity-20" />
+              <h3 className="text-xl font-semibold">Clean Inbox!</h3>
+              <p className="text-muted-foreground mt-2 max-w-sm mx-auto">No pending teacher registration requests to process at this time.</p>
             </div>
           )}
         </TabsContent>
@@ -476,31 +537,36 @@ export default function TeachersPage() {
 
       {/* Rejection Dialog */}
       <Dialog open={rejectionId !== null} onOpenChange={(open) => !open && setRejectionId(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Reject Teacher Registration</DialogTitle>
+            <DialogTitle className="text-destructive flex items-center gap-2">
+              <XCircle className="h-5 w-5" /> Reject Registration
+            </DialogTitle>
             <DialogDescription>
-              Please provide a reason for rejecting this registration. This will be visible to the teacher.
+              Provide a reason for rejecting this teacher's registration.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="reason">Reason for Rejection</Label>
-            <Input
-              id="reason"
-              placeholder="e.g., Incomplete documentation, mismatch in credentials"
-              value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
-              className="mt-2"
-            />
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reason">Rejection Reason</Label>
+              <textarea
+                id="reason"
+                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="e.g., Qualifications do not match our requirements..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectionId(null)} disabled={isSubmitting}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRejectionId(null)} disabled={isSubmitting}>Back</Button>
             <Button variant="destructive" onClick={handleReject} disabled={!rejectionReason || isSubmitting}>
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm Rejection'}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Confirm Rejection
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   )
 }

@@ -53,6 +53,8 @@ export const API_ENDPOINTS = {
   SECTIONS: '/sections/',
   SUBJECTS: '/subjects/',
   SUBJECT_ASSIGNMENTS: '/assignments/',
+  PERIODS: '/periods/',
+  TIMETABLE: '/timetable/',
 
   // Attendance
   ATTENDANCE: '/attendance/',

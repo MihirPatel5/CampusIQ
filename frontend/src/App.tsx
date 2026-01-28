@@ -26,6 +26,7 @@ const ExamsPage = lazy(() => import('./pages/exams/ExamsPage'))
 const FeesPage = lazy(() => import('./pages/fees/FeesPage'))
 const PeriodConfigurationPage = lazy(() => import('./pages/academic/PeriodConfigurationPage'))
 const ClassTimetableManagerPage = lazy(() => import('./pages/academic/ClassTimetableManagerPage'))
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
 
 function App() {
   return (
@@ -73,7 +74,7 @@ function App() {
             <Route path="/notices" element={<ComingSoon title="Notices" />} />
             <Route path="/library" element={<ComingSoon title="Library" />} />
             <Route path="/transport" element={<ComingSoon title="Transport" />} />
-            <Route path="/settings" element={<ComingSoon title="Settings" />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Route>
 

@@ -120,6 +120,13 @@
 }
 
 @layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
   /* Hide scrollbar */
   .scrollbar-hide {
     -ms-overflow-style: none;

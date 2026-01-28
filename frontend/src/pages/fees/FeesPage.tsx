@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react'
-import { Plus, Loader2, FileText, CheckCircle2, AlertCircle, Search, Filter, Receipt, Download, Landmark } from 'lucide-react'
+import { format } from 'date-fns'
+import {
+    Plus,
+    Download,
+    Search,
+    AlertCircle,
+    Loader2,
+    FileText,
+    Trash2,
+    CheckCircle2,
+    Landmark,
+    Filter,
+    Receipt
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { academicService } from '@/services/academicService'
 import { feeService } from '@/services/feeService'
@@ -43,6 +56,8 @@ export default function FeesPage() {
 
     // Dialogs
     const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
+    const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
+    const [isStructureDialogOpen, setIsStructureDialogOpen] = useState(false)
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
 
     const [paymentData, setPaymentData] = useState({
@@ -50,6 +65,19 @@ export default function FeesPage() {
         payment_mode: 'cash' as any,
         transaction_reference: '',
         remarks: ''
+    })
+
+    const [generateData, setGenerateData] = useState({
+        fee_structure_id: '',
+        class_id: '',
+        section_id: ''
+    })
+
+    const [structureData, setStructureData] = useState({
+        name: '',
+        academic_year: '2024-25',
+        class_obj: '',
+        fee_items: [{ name: '', amount: 0, due_date: format(new Date(), 'yyyy-MM-dd') }]
     })
 
     useEffect(() => {
@@ -99,6 +127,53 @@ export default function FeesPage() {
         }
     }
 
+    const handleGenerateBulk = async () => {
+        if (!generateData.fee_structure_id) {
+            toast.error('Select a fee structure')
+            return
+        }
+
+        setIsSaving(true)
+        try {
+            const res = await feeService.generateInvoices({
+                fee_structure_id: parseInt(generateData.fee_structure_id),
+                class_id: generateData.class_id ? parseInt(generateData.class_id) : undefined,
+                section_id: generateData.section_id ? parseInt(generateData.section_id) : undefined
+            })
+            toast.success(res.message || 'Invoices generated successfully')
+            setIsGenerateDialogOpen(false)
+            fetchInitialData()
+        } catch (error) {
+            toast.error(getErrorMessage(error))
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleCreateStructure = async () => {
+        if (!structureData.name || !structureData.class_obj) {
+            toast.error('Structure name and class are required')
+            return
+        }
+
+        setIsSaving(true)
+        try {
+            await feeService.createFeeStructure({
+                ...structureData,
+                class_obj: parseInt(structureData.class_obj),
+                total_amount: structureData.fee_items.reduce((sum, item) => sum + item.amount, 0),
+                fee_items: structureData.fee_items as any
+            })
+            toast.success('Fee structure created successfully')
+            setIsStructureDialogOpen(false)
+            fetchInitialData()
+        } catch (error) {
+            toast.error(getErrorMessage(error))
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     const getStatusColor = (status: string) => {
         switch (status) {
             case 'paid': return 'bg-green-100 text-green-700 border-green-200'
@@ -123,7 +198,7 @@ export default function FeesPage() {
                     <Button variant="outline" className="gap-2">
                         <Download className="h-4 w-4" /> Export Report
                     </Button>
-                    <Button className="gap-2" onClick={() => toast.info('Detailed structure creation coming soon')}>
+                    <Button className="gap-2" onClick={() => setIsStructureDialogOpen(true)}>
                         <Plus className="h-4 w-4" /> New Structure
                     </Button>
                 </div>
@@ -201,7 +276,12 @@ export default function FeesPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <Button variant="secondary" size="sm" className="gap-2">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="gap-2"
+                            onClick={() => setIsGenerateDialogOpen(true)}
+                        >
                             <Receipt className="h-4 w-4" /> Generate Bulk
                         </Button>
                     </div>
@@ -315,6 +395,207 @@ export default function FeesPage() {
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {/* Generate Invoices Dialog */}
+            <Dialog open={isGenerateDialogOpen} onOpenChange={setIsGenerateDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Generate Bulk Invoices</DialogTitle>
+                        <DialogDescription>
+                            Create invoices for all active students in a class or section based on a fee structure.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Fee Structure</Label>
+                            <Select
+                                value={generateData.fee_structure_id}
+                                onValueChange={(v) => {
+                                    setGenerateData({ ...generateData, fee_structure_id: v })
+                                }}
+                            >
+                                <SelectTrigger><SelectValue placeholder="Select Structure" /></SelectTrigger>
+                                <SelectContent>
+                                    {structures.map(s => (
+                                        <SelectItem key={s.id} value={s.id.toString()}>{s.name} ({s.class_name})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Select Class (Optional)</Label>
+                                <Select
+                                    value={generateData.class_id}
+                                    onValueChange={(v) => setGenerateData({ ...generateData, class_id: v, section_id: '' })}
+                                >
+                                    <SelectTrigger><SelectValue placeholder="All Classes" /></SelectTrigger>
+                                    <SelectContent>
+                                        {classes.map(c => (
+                                            <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Section (Optional)</Label>
+                                <Select
+                                    value={generateData.section_id}
+                                    onValueChange={(v) => setGenerateData({ ...generateData, section_id: v })}
+                                    disabled={!generateData.class_id}
+                                >
+                                    <SelectTrigger><SelectValue placeholder="All Sections" /></SelectTrigger>
+                                    <SelectContent>
+                                        {classes.find(c => c.id.toString() === generateData.class_id)?.sections?.map(s => (
+                                            <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 text-xs text-primary flex gap-2">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            <p>This will generate invoices for all active students who don't already have an invoice for this structure.</p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsGenerateDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleGenerateBulk} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Generate Invoices
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Create Fee Structure Dialog */}
+            <Dialog open={isStructureDialogOpen} onOpenChange={setIsStructureDialogOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Create New Fee Structure</DialogTitle>
+                        <DialogDescription>
+                            Define a standard fee skeleton for a class or category.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-6 py-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Structure Name</Label>
+                                <Input
+                                    placeholder="e.g. Annual Tuition 2025"
+                                    value={structureData.name}
+                                    onChange={(e) => setStructureData({ ...structureData, name: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Academic Year</Label>
+                                <Select value={structureData.academic_year} onValueChange={(v) => setStructureData({ ...structureData, academic_year: v })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="2024-25">2024-25</SelectItem>
+                                        <SelectItem value="2025-26">2025-26</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Target Class</Label>
+                            <Select value={structureData.class_obj} onValueChange={(v) => setStructureData({ ...structureData, class_obj: v })}>
+                                <SelectTrigger><SelectValue placeholder="Select Class" /></SelectTrigger>
+                                <SelectContent>
+                                    {classes.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between border-b pb-2">
+                                <Label className="font-bold">Fee Components</Label>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setStructureData({
+                                        ...structureData,
+                                        fee_items: [...structureData.fee_items, { name: '', amount: 0, due_date: format(new Date(), 'yyyy-MM-dd') }]
+                                    })}
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Add Item
+                                </Button>
+                            </div>
+
+                            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                                {structureData.fee_items.map((item, idx) => (
+                                    <div key={idx} className="grid grid-cols-12 gap-3 items-end bg-muted/20 p-3 rounded-lg border border-border/50">
+                                        <div className="col-span-12 lg:col-span-5 space-y-1">
+                                            <Label className="text-[10px] uppercase text-muted-foreground">Item Name</Label>
+                                            <Input
+                                                placeholder="e.g. Tuition"
+                                                value={item.name}
+                                                onChange={(e) => {
+                                                    const newItems = [...structureData.fee_items];
+                                                    newItems[idx].name = e.target.value;
+                                                    setStructureData({ ...structureData, fee_items: newItems });
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="col-span-6 lg:col-span-3 space-y-1">
+                                            <Label className="text-[10px] uppercase text-muted-foreground">Amount</Label>
+                                            <Input
+                                                type="number"
+                                                value={item.amount}
+                                                onChange={(e) => {
+                                                    const newItems = [...structureData.fee_items];
+                                                    newItems[idx].amount = parseFloat(e.target.value) || 0;
+                                                    setStructureData({ ...structureData, fee_items: newItems });
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="col-span-4 lg:col-span-3 space-y-1">
+                                            <Label className="text-[10px] uppercase text-muted-foreground">Due Date</Label>
+                                            <Input
+                                                type="date"
+                                                value={item.due_date}
+                                                onChange={(e) => {
+                                                    const newItems = [...structureData.fee_items];
+                                                    newItems[idx].due_date = e.target.value;
+                                                    setStructureData({ ...structureData, fee_items: newItems });
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="col-span-2 lg:col-span-1 flex justify-center">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-destructive"
+                                                onClick={() => {
+                                                    const newItems = structureData.fee_items.filter((_, i) => i !== idx);
+                                                    setStructureData({ ...structureData, fee_items: newItems });
+                                                }}
+                                                disabled={structureData.fee_items.length === 1}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex justify-between items-center pt-2 border-t">
+                                <span className="font-medium">Total Structure Amount:</span>
+                                <span className="text-xl font-bold">₹ {structureData.fee_items.reduce((sum, i) => sum + i.amount, 0)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsStructureDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleCreateStructure} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Create Structure
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Payment Dialog */}
             <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>

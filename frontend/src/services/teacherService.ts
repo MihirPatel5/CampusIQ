@@ -34,6 +34,11 @@ export const teacherService = {
     })
     return response.data
   },
+
+  async updateTeacher(id: number, data: Partial<TeacherRegistrationData>): Promise<Teacher> {
+    const response = await api.patch<Teacher>(`${API_ENDPOINTS.TEACHERS}${id}/`, data)
+    return response.data
+  },
 }
 
 export default teacherService

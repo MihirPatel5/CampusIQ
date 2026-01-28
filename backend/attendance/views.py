@@ -6,6 +6,7 @@ from accounts.permissions import IsAdmin, IsActiveTeacher
 from django.db.models import Count, Q
 from datetime import date, timedelta
 from .models import Attendance
+from academic.models import Section
 from students.models import StudentProfile
 from .serializers import AttendanceSerializer, BulkAttendanceSerializer, AttendanceStatsSerializer
 
@@ -28,6 +29,20 @@ def mark_attendance(request):
     section_id = data['section_id']
     attendance_records = data['attendance']
     
+    user = request.user
+    
+    # Security Check for Teachers
+    if user.role == 'teacher':
+        try:
+            section = Section.objects.get(id=section_id, school=user.school)
+            if section.class_teacher and section.class_teacher.user != user:
+                return Response(
+                    {'error': 'Security Alert: Only the assigned Class Teacher can mark attendance for this section.'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        except Section.DoesNotExist:
+            return Response({'error': 'Section not found'}, status=status.HTTP_404_NOT_FOUND)
+    
     created_count = 0
     updated_count = 0
     errors = []
@@ -39,7 +54,7 @@ def mark_attendance(request):
         
         try:
             # Filter student by school
-            student = StudentProfile.objects.get(id=student_id, user__school=request.user.school)
+            student = StudentProfile.objects.get(id=student_id, school=request.user.school)
             
             # Check if attendance already exists
             attendance, created = Attendance.objects.update_or_create(
@@ -95,7 +110,7 @@ def get_students_for_marking(request):
         class_obj_id=class_id,
         section_id=section_id,
         status='active',
-        user__school=request.user.school
+        school=request.user.school
     ).select_related('user')
     
     # Get existing attendance for the date

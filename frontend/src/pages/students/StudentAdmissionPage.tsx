@@ -13,7 +13,7 @@ import {
 import { studentService } from '@/services/studentService'
 import { academicService } from '@/services/academicService'
 import { getErrorMessage } from '@/services/api'
-import type { Class, Section } from '@/types'
+import type { Class, Section, GroupedFormConfig, AdmissionFormConfig } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -65,6 +65,7 @@ export default function StudentAdmissionPage() {
   const [classes, setClasses] = useState<Class[]>([])
   const [sections, setSections] = useState<Section[]>([])
   const [activeTab, setActiveTab] = useState('personal')
+  const [formConfig, setFormConfig] = useState<GroupedFormConfig>({})
 
   const {
     register,
@@ -90,7 +91,7 @@ export default function StudentAdmissionPage() {
   const selectedClass = watch('class_obj')
 
   useEffect(() => {
-    fetchClasses()
+    fetchInitialData()
   }, [])
 
   useEffect(() => {
@@ -99,12 +100,19 @@ export default function StudentAdmissionPage() {
     }
   }, [selectedClass])
 
-  const fetchClasses = async () => {
+  const fetchInitialData = async () => {
+    setIsLoading(true)
     try {
-      const data = await academicService.getClasses()
-      setClasses(data)
+      const [classesData, configData] = await Promise.all([
+        academicService.getClasses(),
+        studentService.getFormConfigBySection()
+      ])
+      setClasses(classesData)
+      setFormConfig(configData)
     } catch (error) {
-      console.error('Error fetching classes:', error)
+      console.error('Error fetching initial data:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -128,6 +136,20 @@ export default function StudentAdmissionPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const isFieldVisible = (section: string, fieldName: string) => {
+    const sectionFields = formConfig[section]
+    if (!sectionFields) return true // Default visible if no config
+    const field = sectionFields.find((f: AdmissionFormConfig) => f.field_name === fieldName)
+    return field ? field.is_visible : true
+  }
+
+  const isFieldRequired = (section: string, fieldName: string) => {
+    const sectionFields = formConfig[section]
+    if (!sectionFields) return false
+    const field = sectionFields.find((f: AdmissionFormConfig) => f.field_name === fieldName)
+    return field ? field.is_required : false
   }
 
   return (
@@ -183,39 +205,49 @@ export default function StudentAdmissionPage() {
                   {errors.last_name && <p className="text-xs text-destructive">{errors.last_name.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="date_of_birth">Date of Birth</Label>
+                  <Label htmlFor="date_of_birth">Date of Birth {isFieldRequired('personal', 'date_of_birth') && '*'}</Label>
                   <Input id="date_of_birth" type="date" {...register('date_of_birth')} />
                   {errors.date_of_birth && <p className="text-xs text-destructive">{errors.date_of_birth.message}</p>}
                 </div>
-                <div className="space-y-2">
-                  <Label>Gender</Label>
-                  <Select onValueChange={(val) => setValue('gender', val as any)} defaultValue="male">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="blood_group">Blood Group</Label>
-                  <Input id="blood_group" placeholder="O+" {...register('blood_group')} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="aadhaar_number">Aadhaar Number</Label>
-                  <Input id="aadhaar_number" placeholder="XXXX-XXXX-XXXX" {...register('aadhaar_number')} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email (Optional)</Label>
-                  <Input id="email" type="email" placeholder="rahul@example.com" {...register('email')} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone (Optional)</Label>
-                  <Input id="phone" placeholder="+91-XXXXXXXXXX" {...register('phone')} />
-                </div>
+                {isFieldVisible('personal', 'gender') && (
+                  <div className="space-y-2">
+                    <Label>Gender {isFieldRequired('personal', 'gender') && '*'}</Label>
+                    <Select onValueChange={(val) => setValue('gender', val as any)} defaultValue="male">
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Gender" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">Male</SelectItem>
+                        <SelectItem value="female">Female</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {isFieldVisible('personal', 'blood_group') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="blood_group">Blood Group {isFieldRequired('personal', 'blood_group') && '*'}</Label>
+                    <Input id="blood_group" placeholder="O+" {...register('blood_group')} />
+                  </div>
+                )}
+                {isFieldVisible('personal', 'aadhaar_number') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="aadhaar_number">Aadhaar Number {isFieldRequired('personal', 'aadhaar_number') && '*'}</Label>
+                    <Input id="aadhaar_number" placeholder="XXXX-XXXX-XXXX" {...register('aadhaar_number')} />
+                  </div>
+                )}
+                {isFieldVisible('contact', 'email') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email {isFieldRequired('contact', 'email') ? '*' : '(Optional)'}</Label>
+                    <Input id="email" type="email" placeholder="rahul@example.com" {...register('email')} />
+                  </div>
+                )}
+                {isFieldVisible('contact', 'phone') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone {isFieldRequired('contact', 'phone') ? '*' : '(Optional)'}</Label>
+                    <Input id="phone" placeholder="+91-XXXXXXXXXX" {...register('phone')} />
+                  </div>
+                )}
                 <div className="md:col-span-2 space-y-2">
                   <Label htmlFor="address">Address</Label>
                   <Input id="address" placeholder="123 Street Name" {...register('address')} />
@@ -291,14 +323,18 @@ export default function StudentAdmissionPage() {
                   </Select>
                   {errors.section && <p className="text-xs text-destructive">{errors.section.message}</p>}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="previous_school">Previous School</Label>
-                  <Input id="previous_school" placeholder="Little Flowers School" {...register('previous_school')} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="previous_class">Previous Class</Label>
-                  <Input id="previous_class" placeholder="Class 9" {...register('previous_class')} />
-                </div>
+                {isFieldVisible('academic', 'previous_school') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="previous_school">Previous School {isFieldRequired('academic', 'previous_school') && '*'}</Label>
+                    <Input id="previous_school" placeholder="Little Flowers School" {...register('previous_school')} />
+                  </div>
+                )}
+                {isFieldVisible('academic', 'previous_class') && (
+                  <div className="space-y-2">
+                    <Label htmlFor="previous_class">Previous Class {isFieldRequired('academic', 'previous_class') && '*'}</Label>
+                    <Input id="previous_class" placeholder="Class 9" {...register('previous_class')} />
+                  </div>
+                )}
                 <div className="md:col-span-2 space-y-2">
                   <Label htmlFor="password">Login Password (Optional)</Label>
                   <Input id="password" type="password" placeholder="Default: student123" {...register('password')} />
@@ -358,14 +394,18 @@ export default function StudentAdmissionPage() {
                         <Input placeholder="+91-XXXXXXXXXX" {...register(`parents.${index}.phone`)} />
                         {errors.parents?.[index]?.phone && <p className="text-xs text-destructive">{errors.parents[index]?.phone?.message}</p>}
                       </div>
-                      <div className="space-y-2">
-                        <Label>Email</Label>
-                        <Input placeholder="email@example.com" {...register(`parents.${index}.email`)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Occupation</Label>
-                        <Input placeholder="Business / Salaried" {...register(`parents.${index}.occupation`)} />
-                      </div>
+                      {isFieldVisible('parent', 'email') && (
+                        <div className="space-y-2">
+                          <Label>Email {isFieldRequired('parent', 'email') && '*'}</Label>
+                          <Input placeholder="email@example.com" {...register(`parents.${index}.email`)} />
+                        </div>
+                      )}
+                      {isFieldVisible('parent', 'occupation') && (
+                        <div className="space-y-2">
+                          <Label>Occupation {isFieldRequired('parent', 'occupation') && '*'}</Label>
+                          <Input placeholder="Business / Salaried" {...register(`parents.${index}.occupation`)} />
+                        </div>
+                      )}
                       <div className="lg:col-span-3 flex items-center gap-2">
                         <input
                           type="checkbox"

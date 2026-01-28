@@ -213,13 +213,20 @@ export default function AdmissionFormConfigPage() {
                 </div>
             ) : (
                 <Tabs value={activeSection} onValueChange={setActiveSection} className="space-y-6">
-                    <TabsList className="grid grid-cols-5 lg:grid-cols-10 gap-2">
-                        {Object.keys(formConfig).map((section) => (
-                            <TabsTrigger key={section} value={section} className="text-xs">
-                                {SECTION_LABELS[section] || section}
-                            </TabsTrigger>
-                        ))}
-                    </TabsList>
+                    <div className="relative">
+                        <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent pointer-events-none z-10" />
+                        <TabsList className="flex w-full justify-start h-auto p-1 bg-muted/30 overflow-x-auto no-scrollbar scroll-smooth gap-1 border-b rounded-none lg:rounded-lg">
+                            {Object.keys(formConfig).map((section) => (
+                                <TabsTrigger
+                                    key={section}
+                                    value={section}
+                                    className="px-4 py-2 text-xs whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md transition-all"
+                                >
+                                    {SECTION_LABELS[section] || section}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                    </div>
 
                     {Object.entries(formConfig).map(([section, fields]) => (
                         <TabsContent key={section} value={section} className="space-y-4">

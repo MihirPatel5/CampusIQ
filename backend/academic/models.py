@@ -14,6 +14,14 @@ class Class(TenantAwareModel):
     name = models.CharField(max_length=100, help_text="e.g., 'Class 10'")
     code = models.CharField(max_length=20, help_text="e.g., 'C10'")
     academic_year = models.CharField(max_length=10, help_text="e.g., '2024-25'")
+    class_teacher = models.ForeignKey(
+        'accounts.TeacherProfile',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='class_coordinator_of',
+        help_text="Optional head teacher/coordinator for this class"
+    )
     description = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     
@@ -24,7 +32,7 @@ class Class(TenantAwareModel):
         indexes = [
             models.Index(fields=['school', 'code']),
             models.Index(fields=['school', 'academic_year']),
-            models.Index(fields=['status']),
+            models.Index(fields=['status', 'class_teacher']),
         ]
         unique_together = [('school', 'code', 'academic_year')]
     
@@ -152,6 +160,7 @@ class SubjectAssignment(TenantAwareModel):
         related_name='subject_assignments'
     )
     academic_year = models.CharField(max_length=10, help_text="e.g., '2024-25'")
+    max_marks = models.IntegerField(default=100, help_text="Maximum marks for this specific class assignment")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
     
     class Meta:
@@ -167,7 +176,7 @@ class SubjectAssignment(TenantAwareModel):
         unique_together = [('school', 'class_obj', 'section', 'subject', 'academic_year')]
     
     def __str__(self):
-        return f"{self.subject.name} - {self.class_obj.name} {self.section.name} ({self.teacher.user.get_full_name()}) - {self.school.name}"
+        return f"{self.subject.name} ({self.max_marks}) - {self.class_obj.name} {self.section.name} ({self.teacher.user.get_full_name()}) - {self.school.name}"
     
     def clean(self):
         """Validation to ensure teacher is active and verified"""

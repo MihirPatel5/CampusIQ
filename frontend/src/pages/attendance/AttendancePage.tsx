@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
-import { CheckCircle2, XCircle, Clock, AlertCircle, Loader2, Save, Search, History, UserCheck } from 'lucide-react'
+import { CheckCircle2, XCircle, Clock, AlertCircle, Loader2, Save, Search, History, UserCheck, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { academicService } from '@/services/academicService'
 import { attendanceService, type StudentForMarking } from '@/services/attendanceService'
+import { useAuthStore } from '@/stores/authStore'
 import { getErrorMessage } from '@/services/api'
 import type { Class, Section } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -29,12 +31,44 @@ export default function AttendancePage() {
     const [date, setDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
 
     const [students, setStudents] = useState<StudentForMarking[]>([])
+    const [searchTerm, setSearchTerm] = useState('')
     const [isLoadingStudents, setIsLoadingStudents] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
+
+    // History State
+    const [historyRecords, setHistoryRecords] = useState<any[]>([])
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+    const [historyFilters, setHistoryFilters] = useState({
+        date_from: format(new Date(new Date().setDate(new Date().getDate() - 7)), 'yyyy-MM-dd'),
+        date_to: format(new Date(), 'yyyy-MM-dd'),
+        class_id: '',
+        status: 'all'
+    })
 
     useEffect(() => {
         fetchAcademicData()
+        fetchHistory()
     }, [])
+
+    const fetchHistory = async () => {
+        setIsLoadingHistory(true)
+        try {
+            const params: any = {
+                date_from: historyFilters.date_from,
+                date_to: historyFilters.date_to
+            }
+            if (historyFilters.class_id) params.class_id = historyFilters.class_id
+            if (historyFilters.status !== 'all') params.status = historyFilters.status
+
+            const data = await attendanceService.getAttendanceRecords(params)
+            setHistoryRecords(data)
+        } catch (error) {
+            toast.error(getErrorMessage(error))
+        } finally {
+            setIsLoadingHistory(false)
+        }
+    }
 
     useEffect(() => {
         if (selectedClass) {
@@ -69,6 +103,7 @@ export default function AttendancePage() {
         }
 
         setIsLoadingStudents(true)
+        setIsEditing(false)
         try {
             const data = await attendanceService.getStudentsForMarking(
                 parseInt(selectedClass),
@@ -115,12 +150,36 @@ export default function AttendancePage() {
                 }))
             })
             toast.success('Attendance saved successfully')
+            setIsEditing(false)
         } catch (error) {
             toast.error(getErrorMessage(error))
         } finally {
             setIsSaving(false)
         }
     }
+
+    const user = useAuthStore((state) => state.user)
+    const activeSectionObj = sections.find(s => s.id.toString() === selectedSection)
+
+    // Permission: Admin can do anything. Teachers can ONLY mark their assigned section.
+    const canMarkAttendance = user?.role === 'admin' ||
+        (user?.role === 'teacher' && user.teacher_profile_id === activeSectionObj?.class_teacher)
+
+    // Note: To be 100% sure, we compare usernames or user IDs. 
+    // In our system, the User model has the school and role.
+    const isRestrictedTeacher = user?.role === 'teacher' && !canMarkAttendance
+
+    const filteredStudents = students
+        .filter(s =>
+            s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.admission_number.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a, b) => {
+            // Natural sort for roll numbers (if they are numeric strings)
+            const rollA = a.admission_number || ''
+            const rollB = b.admission_number || ''
+            return rollA.localeCompare(rollB, undefined, { numeric: true, sensitivity: 'base' })
+        })
 
     return (
         <div className="space-y-8">
@@ -194,21 +253,60 @@ export default function AttendancePage() {
                     </Card>
 
                     {students.length > 0 && (
-                        <Card className="border-border/50">
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <div>
+                        <Card className="border-border/50 shadow-sm overflow-hidden">
+                            <CardHeader className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4">
+                                <div className="space-y-1">
                                     <CardTitle>Attendance List</CardTitle>
                                     <CardDescription>
                                         {students.length} students in {classes.find(c => c.id.toString() === selectedClass)?.name} - {sections.find(s => s.id.toString() === selectedSection)?.name}
+                                        {isRestrictedTeacher && (
+                                            <span className="block text-destructive font-semibold mt-1">
+                                                (Read-Only: Only the assigned Class Teacher or Admin can mark attendance)
+                                            </span>
+                                        )}
                                     </CardDescription>
                                 </div>
-                                <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => handleMarkAll('present')} className="text-success hover:text-success hover:bg-success/10">
-                                        Mark All Present
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleMarkAll('absent')} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                                        Mark All Absent
-                                    </Button>
+                                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                                    <div className="relative w-full md:w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search name or roll no..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="pl-9 h-9"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                        {!isEditing && canMarkAttendance ? (
+                                            <Button
+                                                onClick={() => setIsEditing(true)}
+                                                className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 font-semibold shadow-md px-6 rounded-full hover:scale-105 active:scale-95"
+                                            >
+                                                <Pencil className="h-4 w-4" /> Edit Attendance
+                                            </Button>
+                                        ) : isEditing ? (
+                                            <>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleMarkAll('present')}
+                                                    disabled={isRestrictedTeacher}
+                                                    className="text-success hover:text-success hover:bg-success/10 flex-1 md:flex-none"
+                                                >
+                                                    Mark All Present
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleMarkAll('absent')}
+                                                    disabled={isRestrictedTeacher}
+                                                    className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-1 md:flex-none"
+                                                >
+                                                    Mark All Absent
+                                                </Button>
+                                            </>
+                                        ) : null}
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-0">
@@ -216,19 +314,26 @@ export default function AttendancePage() {
                                     <table className="w-full text-sm">
                                         <thead className="bg-muted/50 text-muted-foreground border-y">
                                             <tr>
-                                                <th className="px-6 py-3 text-left font-medium">Student Info</th>
-                                                <th className="px-6 py-3 text-center font-medium">Status</th>
-                                                <th className="px-6 py-3 text-left font-medium">Remarks</th>
+                                                <th className="px-6 py-3 text-left font-semibold">Roll No / ID</th>
+                                                <th className="px-6 py-3 text-left font-semibold">Student Name</th>
+                                                <th className="px-6 py-3 text-center font-semibold">Status</th>
+                                                <th className="px-6 py-3 text-left font-semibold">Remarks</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y">
-                                            {students.map((student) => (
+                                            {filteredStudents.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground italic">
+                                                        No students found matching your search criteria.
+                                                    </td>
+                                                </tr>
+                                            ) : filteredStudents.map((student) => (
                                                 <tr key={student.student_id} className="hover:bg-muted/30 transition-colors">
+                                                    <td className="px-6 py-4 font-mono text-xs font-semibold">
+                                                        {student.admission_number}
+                                                    </td>
                                                     <td className="px-6 py-4">
-                                                        <div>
-                                                            <p className="font-medium text-foreground">{student.name}</p>
-                                                            <p className="text-xs text-muted-foreground">{student.admission_number}</p>
-                                                        </div>
+                                                        <span className="font-medium text-foreground">{student.name}</span>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center justify-center gap-2">
@@ -240,13 +345,18 @@ export default function AttendancePage() {
                                                             ].map((opt) => {
                                                                 const Icon = opt.icon
                                                                 const isActive = student.status === opt.id
+
+                                                                if (!isEditing && !isActive) return null; // Only show active status when not editing
+
                                                                 return (
                                                                     <button
                                                                         key={opt.id}
-                                                                        onClick={() => handleStatusChange(student.student_id, opt.id as any)}
+                                                                        onClick={() => isEditing && !isRestrictedTeacher && handleStatusChange(student.student_id, opt.id as any)}
+                                                                        disabled={!isEditing || isRestrictedTeacher}
                                                                         className={cn(
                                                                             "p-2 rounded-lg border border-transparent transition-all capitalize flex flex-col items-center gap-1 min-w-[60px]",
-                                                                            isActive ? opt.activeClass : "hover:bg-muted text-muted-foreground"
+                                                                            isActive ? opt.activeClass : "hover:bg-muted text-muted-foreground",
+                                                                            (!isEditing || isRestrictedTeacher) && "cursor-default"
                                                                         )}
                                                                     >
                                                                         <Icon className="h-5 w-5" />
@@ -254,6 +364,9 @@ export default function AttendancePage() {
                                                                     </button>
                                                                 )
                                                             })}
+                                                            {!isEditing && !student.status && (
+                                                                <span className="text-muted-foreground text-xs italic">Not Marked</span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
@@ -262,6 +375,7 @@ export default function AttendancePage() {
                                                             value={student.remarks}
                                                             onChange={(e) => handleRemarksChange(student.student_id, e.target.value)}
                                                             className="h-8 text-xs"
+                                                            disabled={isRestrictedTeacher || !isEditing}
                                                         />
                                                     </td>
                                                 </tr>
@@ -274,10 +388,12 @@ export default function AttendancePage() {
                                 <div className="text-sm text-muted-foreground">
                                     {students.filter(s => s.status === 'present').length} Present, {students.filter(s => s.status === 'absent').length} Absent
                                 </div>
-                                <Button onClick={handleSave} disabled={isSaving} className="gap-2 px-8">
-                                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                    Save Attendance
-                                </Button>
+                                {isEditing && (
+                                    <Button onClick={handleSave} disabled={isSaving || isRestrictedTeacher} className="gap-2 px-8">
+                                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                        {isRestrictedTeacher ? 'Marking Restricted' : 'Save Attendance'}
+                                    </Button>
+                                )}
                             </CardFooter>
                         </Card>
                     )}
@@ -289,18 +405,108 @@ export default function AttendancePage() {
                     )}
                 </TabsContent>
 
-                <TabsContent value="history">
-                    <Card>
+                <TabsContent value="history" className="space-y-6">
+                    <Card className="border-border/50 bg-card/50">
                         <CardHeader>
-                            <CardTitle>Attendance History</CardTitle>
-                            <CardDescription>View past attendance records and reports</CardDescription>
+                            <CardTitle className="text-lg">History Filters</CardTitle>
+                            <CardDescription>Filter past records by date range and class</CardDescription>
                         </CardHeader>
-                        <CardContent className="h-64 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg mx-6 mb-6">
-                            <History className="h-10 w-10 mb-2 opacity-20" />
-                            <p>Detailed history view is under construction.</p>
-                            <p className="text-xs">Use the list view to see already marked status for the day.</p>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                                <div className="space-y-2">
+                                    <Label>Date From</Label>
+                                    <Input
+                                        type="date"
+                                        value={historyFilters.date_from}
+                                        onChange={(e) => setHistoryFilters({ ...historyFilters, date_from: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Date To</Label>
+                                    <Input
+                                        type="date"
+                                        value={historyFilters.date_to}
+                                        onChange={(e) => setHistoryFilters({ ...historyFilters, date_to: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Class</Label>
+                                    <Select
+                                        value={historyFilters.class_id}
+                                        onValueChange={(v) => setHistoryFilters({ ...historyFilters, class_id: v })}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="All Classes" /></SelectTrigger>
+                                        <SelectContent>
+                                            {classes.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Status</Label>
+                                    <Select
+                                        value={historyFilters.status}
+                                        onValueChange={(v) => setHistoryFilters({ ...historyFilters, status: v })}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="All Status" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Status</SelectItem>
+                                            <SelectItem value="present">Present</SelectItem>
+                                            <SelectItem value="absent">Absent</SelectItem>
+                                            <SelectItem value="late">Late</SelectItem>
+                                            <SelectItem value="excused">Excused</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Button onClick={fetchHistory} variant="secondary" className="gap-2">
+                                    <Search className="h-4 w-4" /> Filter History
+                                </Button>
+                            </div>
                         </CardContent>
                     </Card>
+
+                    <div className="border rounded-xl bg-card overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-muted/50 border-b text-muted-foreground">
+                                <tr>
+                                    <th className="px-6 py-4 font-medium">Date</th>
+                                    <th className="px-6 py-4 font-medium">Student</th>
+                                    <th className="px-6 py-4 font-medium">Class / Section</th>
+                                    <th className="px-6 py-4 font-medium">Status</th>
+                                    <th className="px-6 py-4 font-medium">Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y text-foreground/80">
+                                {isLoadingHistory ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <tr key={i}><td colSpan={5} className="px-6 py-4"><Skeleton className="h-6 w-full" /></td></tr>
+                                    ))
+                                ) : historyRecords.length === 0 ? (
+                                    <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">No records found for the selected criteria.</td></tr>
+                                ) : historyRecords.map((rec: any) => (
+                                    <tr key={rec.id} className="hover:bg-muted/30 transition-colors">
+                                        <td className="px-6 py-4 font-medium">{format(new Date(rec.date), 'dd MMM yyyy')}</td>
+                                        <td className="px-6 py-4">
+                                            <div>
+                                                <p className="font-semibold text-foreground">{rec.student_name}</p>
+                                                <p className="text-[10px] text-muted-foreground uppercase">{rec.admission_number}</p>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">{rec.class_name} - {rec.section_name}</td>
+                                        <td className="px-6 py-4">
+                                            <Badge variant="outline" className={cn("capitalize",
+                                                rec.status === 'present' ? 'bg-success/10 text-success border-success/20' :
+                                                    rec.status === 'absent' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                                                        'bg-warning/10 text-warning border-warning/20'
+                                            )}>
+                                                {rec.status}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4 text-xs italic opacity-70">{rec.remarks || '-'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </TabsContent>
             </Tabs>
         </div>

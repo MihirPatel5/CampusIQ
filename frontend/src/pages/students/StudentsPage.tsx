@@ -8,6 +8,7 @@ import { getErrorMessage } from '@/services/api'
 import type { Student, GroupedFormConfig, AdmissionFormConfig, Class, Section } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -43,12 +44,14 @@ export default function StudentsPage() {
   const [isConfigLoading, setIsConfigLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     basic: true,
     academic: true,
   })
 
-  const { handleSubmit, setValue, watch, formState: { errors }, setError, clearErrors } = useForm()
+  const { handleSubmit, setValue, watch, formState: { errors }, setError, clearErrors, reset: resetForm } = useForm()
   const formData = watch()
 
   useEffect(() => {
@@ -99,6 +102,21 @@ export default function StudentsPage() {
     }
   }
 
+  const handleEditStudent = async (student: Student) => {
+    setViewingStudent(null)
+    setEditingStudent(student)
+    setIsEditing(true)
+    setIsOpen(true)
+
+    // Pre-fill form
+    resetForm(student)
+
+    // Ensure sections are loaded for their class
+    if (student.class_obj) {
+      fetchSections(student.class_obj)
+    }
+  }
+
   const onSubmit = async (data: any) => {
     // Validate required fields based on form config
     let hasErrors = false
@@ -124,9 +142,16 @@ export default function StudentsPage() {
 
     setIsSaving(true)
     try {
-      await studentService.createStudent(data)
-      toast.success('Student admitted successfully')
+      if (isEditing && editingStudent) {
+        await studentService.updateStudent(editingStudent.id, data)
+        toast.success('Student record updated successfully')
+      } else {
+        await studentService.createStudent(data)
+        toast.success('Student admitted successfully')
+      }
       setIsOpen(false)
+      setIsEditing(false)
+      setEditingStudent(null)
       fetchStudents()
     } catch (error) {
       toast.error(getErrorMessage(error))
@@ -240,6 +265,8 @@ export default function StudentsPage() {
     )
   }
 
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -253,44 +280,51 @@ export default function StudentsPage() {
           </p>
         </div>
 
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(open) => {
+          setIsOpen(open)
+          if (!open) {
+            setIsEditing(false)
+            setEditingStudent(null)
+            resetForm()
+          }
+        }}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
               Admit Student
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-            <DialogHeader>
-              <DialogTitle>Admit New Student</DialogTitle>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+            <DialogHeader className="p-6 pb-2">
+              <DialogTitle>{isEditing ? 'Edit Student Record' : 'Admit New Student'}</DialogTitle>
               <DialogDescription>
-                Fill in the student information below. Fields marked with * are required.
+                {isEditing ? 'Update student information below.' : 'Fill in the student information below.'} Fields marked with * are required.
               </DialogDescription>
             </DialogHeader>
 
-            {isConfigLoading ? (
-              <div className="space-y-4 py-4">
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-                <Skeleton className="h-20 w-full" />
-              </div>
-            ) : (
-              <ScrollArea className="flex-1 pr-4">
+            <div className="flex-1 overflow-y-auto px-6 py-2">
+              {isConfigLoading ? (
+                <div className="space-y-4 py-4">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : (
                 <form id="admissionForm" onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
                   {Object.entries(formConfig).map(([section, fields]) =>
                     renderFormSection(section, fields)
                   )}
                 </form>
-              </ScrollArea>
-            )}
+              )}
+            </div>
 
-            <DialogFooter className="pt-4 border-t">
+            <DialogFooter className="p-6 pt-4 border-t bg-muted/20">
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                 Cancel
               </Button>
               <Button type="submit" form="admissionForm" disabled={isSaving || isConfigLoading}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Admit Student
+                {isEditing ? 'Update Student' : 'Admit Student'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -320,7 +354,9 @@ export default function StudentsPage() {
                       {student.admission_number} • {student.class_name} - {student.section_name}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm">View Details</Button>
+                  <Button variant="outline" size="sm" onClick={() => setViewingStudent(student)}>
+                    View Details
+                  </Button>
                 </div>
               ))}
             </div>
@@ -332,6 +368,74 @@ export default function StudentsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Student Details Modal */}
+      <Dialog open={viewingStudent !== null} onOpenChange={(open) => !open && setViewingStudent(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">{viewingStudent?.full_name}</DialogTitle>
+            <DialogDescription>
+              Admission No: {viewingStudent?.admission_number} | {viewingStudent?.class_name} - {viewingStudent?.section_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-1">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-primary mb-2 border-b pb-1">Personal Information</h4>
+                  <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <span className="text-muted-foreground">Date of Birth:</span> <span>{viewingStudent?.date_of_birth}</span>
+                    <span className="text-muted-foreground">Gender:</span> <span className="capitalize">{viewingStudent?.gender}</span>
+                    <span className="text-muted-foreground">Blood Group:</span> <span>{viewingStudent?.blood_group || 'N/A'}</span>
+                    <span className="text-muted-foreground">Category:</span> <span className="capitalize">{viewingStudent?.category || 'General'}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-primary mb-2 border-b pb-1">Contact Information</h4>
+                  <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <span className="text-muted-foreground">Email:</span> <span>{viewingStudent?.email || 'N/A'}</span>
+                    <span className="text-muted-foreground">Phone:</span> <span>{viewingStudent?.phone || 'N/A'}</span>
+                    <span className="text-muted-foreground">Address:</span> <span className="col-span-1">{viewingStudent?.address}</span>
+                    <span className="text-muted-foreground">City/State:</span> <span>{viewingStudent?.city}, {viewingStudent?.state}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-primary mb-2 border-b pb-1">Academic Information</h4>
+                  <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <span className="text-muted-foreground">Admission Date:</span> <span>{viewingStudent?.admission_date}</span>
+                    <span className="text-muted-foreground">Roll Number:</span> <span>{viewingStudent?.roll_number || 'Not assigned'}</span>
+                    <span className="text-muted-foreground">Status:</span>
+                    <Badge variant={viewingStudent?.status === 'active' ? 'default' : 'secondary'} className="w-fit scale-90">
+                      {viewingStudent?.status}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-primary mb-2 border-b pb-1">Emergency Contact</h4>
+                  <div className="grid grid-cols-2 gap-y-2 text-sm">
+                    <span className="text-muted-foreground">Name:</span> <span>{viewingStudent?.emergency_contact_name || 'N/A'}</span>
+                    <span className="text-muted-foreground">Relation:</span> <span>{viewingStudent?.emergency_contact_relation || 'N/A'}</span>
+                    <span className="text-muted-foreground">Phone:</span> <span>{viewingStudent?.emergency_contact_phone || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="mt-6 border-t pt-4">
+            <Button variant="outline" onClick={() => setViewingStudent(null)}>Close</Button>
+            <Button onClick={() => {
+              if (viewingStudent) handleEditStudent(viewingStudent)
+            }}>Edit Information</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
