@@ -207,8 +207,33 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # Only in development!
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    # Read CORS origins from environment (comma-separated)
+    cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', '')
+    if cors_origins:
+        CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',')]
+    else:
+        CORS_ALLOWED_ORIGINS = []
+    
+    # Always allow S3 frontend in production
+    CORS_ALLOWED_ORIGINS.append('http://campus-iq-frontend.s3-website-ap-southeast-2.amazonaws.com')
+    
+# CORS headers configuration
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Production/Staging: specify exact origins
 if not DEBUG:
