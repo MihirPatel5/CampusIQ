@@ -88,12 +88,6 @@ class SectionSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_current_strength(self, obj):
-        return obj.get_current_strength()
-    
-    def get_has_capacity(self, obj):
-        return obj.has_capacity()
-
-
 class SubjectSerializer(serializers.ModelSerializer):
     """Serializer for Subject model"""
     
