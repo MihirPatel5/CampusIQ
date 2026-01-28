@@ -24,5 +24,20 @@ jobs:
           script: |
             cd CampusIQ
             git pull origin master
-            sudo docker compose -f docker-compose.backend.yml up -d --build
+            
+            # Build and start container
+            sudo docker compose -f docker-compose.backend.yml build
+            sudo docker compose -f docker-compose.backend.yml up -d
+            
+            # Wait for health check (max 60 seconds)
+            echo "Waiting for application to be healthy..."
+            for i in {1..60}; do
+              if curl -f http://localhost:8000/health/ 2>/dev/null; then
+                echo "Application is healthy!"
+                break
+              fi
+              echo "Attempt $i/60..."
+              sleep 1
+            done
+            
             sudo docker system prune -f

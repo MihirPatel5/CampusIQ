@@ -40,6 +40,10 @@ export function Sidebar() {
         ...(user?.role === 'super_admin' ? [
           { label: 'Schools', icon: Building2, path: '/schools' }
         ] : []),
+        // Show School Profile for admins who have created a school
+        ...(user?.role === 'admin' && user.school ? [
+          { label: 'School Profile', icon: Building2, path: '/schools' }
+        ] : []),
       ],
     },
     {
@@ -91,7 +95,7 @@ export function Sidebar() {
                 exit={{ opacity: 0, width: 0 }}
                 className="font-display font-bold text-lg text-sidebar-foreground whitespace-nowrap overflow-hidden"
               >
-                School ERP
+                {user?.school?.name || 'School ERP'}
               </motion.span>
             )}
           </AnimatePresence>

@@ -4,6 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsAdmin, IsAdminOrReadOnly
 from .models import Class, Section, Subject, SubjectAssignment, Period, TimetableEntry
 from .serializers import ClassSerializer, SectionSerializer, SubjectSerializer, SubjectAssignmentSerializer, PeriodSerializer, TimetableEntrySerializer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ClassViewSet(TenantMixin, viewsets.ModelViewSet):
@@ -89,7 +92,7 @@ class SectionViewSet(TenantMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         kwargs = {'created_by': user}
-        print(f"DEBUG: SectionViewSet - User: {user}, School: {user.school if hasattr(user, 'school') else 'No Attr'}")
+        logger.debug(f"SectionViewSet - User: {user}, School: {user.school if hasattr(user, 'school') else 'No Attr'}")
         if user.school:
             kwargs['school'] = user.school
         serializer.save(**kwargs)

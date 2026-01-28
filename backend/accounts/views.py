@@ -151,7 +151,7 @@ class TeacherViewSet(viewsets.ModelViewSet):
         if user.is_super_admin():
             pass
         # School admin sees only their school's teachers
-        elif user.is_school_admin():
+        elif user.is_school_admin() and user.school:
             queryset = queryset.filter(user__school=user.school)
         else:
             queryset = queryset.none()
@@ -187,7 +187,8 @@ class TeacherViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='pending')
     def pending(self, request):
         """Get all pending teacher registrations"""
-        pending_teachers = self.queryset.filter(status='pending')
+        # Ensure we use filtered queryset for multi-tenancy
+        pending_teachers = self.get_queryset().filter(status='pending')
         serializer = self.get_serializer(pending_teachers, many=True)
         return Response(serializer.data)
     
@@ -333,33 +334,54 @@ class DashboardStatsView(APIView):
         
         if user.role == 'super_admin' or user.is_superuser:
             # System-wide stats for super admin
+            from students.models import StudentProfile
+            
             total_schools = School.objects.count()
             total_students = StudentProfile.objects.count()
             total_teachers = TeacherProfile.objects.count()
+            active_schools = School.objects.filter(status='active').count()
             
             return Response({
                 'stats': [
-                    {'title': 'Total Schools', 'value': total_schools, 'icon': 'building', 'change': 5},
-                    {'title': 'Total Students', 'value': total_students, 'icon': 'users', 'change': 12},
-                    {'title': 'Total Teachers', 'value': total_teachers, 'icon': 'graduation-cap', 'change': 3},
-                    {'title': 'System Status', 'value': 'Healthy', 'icon': 'activity'},
+                    {'title': 'Total Schools', 'value': total_schools, 'icon': 'building', 'change': 0},
+                    {'title': 'Active Schools', 'value': active_schools, 'icon': 'check-circle', 'change': 0},
+                    {'title': 'Total Students', 'value': total_students, 'icon': 'users', 'change': 0},
+                    {'title': 'Total Teachers', 'value': total_teachers, 'icon': 'graduation-cap', 'change': 0},
                 ]
             })
         
         elif user.school:
             # School-specific stats for admin/teacher
+            from students.models import StudentProfile
+            from academic.models import Class
+            from attendance.models import Attendance
+            from datetime import date
+            
             school = user.school
-            total_students = StudentProfile.objects.filter(user__school=school).count()
-            total_teachers = User.objects.filter(school=school, role='teacher').count()
-            # Mocking attendance and fees for now until those modules are fully integrated
-            attendance_rate = "94.2%" 
+            
+            # Real counts
+            total_students = StudentProfile.objects.filter(school=school, status='active').count()
+            total_teachers = User.objects.filter(school=school, role='teacher', is_active=True).count()
+            total_classes = Class.objects.filter(school=school, status='active').count()
+            
+            # Calculate today's attendance percentage
+            today = date.today()
+            today_attendance = Attendance.objects.filter(school=school, date=today)
+            total_marked = today_attendance.count()
+            
+            if total_marked > 0:
+                present_count = today_attendance.filter(status__in=['present', 'late']).count()
+                attendance_percentage = round((present_count / total_marked) * 100, 1)
+                attendance_rate = f"{attendance_percentage}%"
+            else:
+                attendance_rate = "No data"
             
             return Response({
                 'stats': [
-                    {'title': 'Total Students', 'value': total_students, 'icon': 'users', 'change': 8},
-                    {'title': 'Total Teachers', 'value': total_teachers, 'icon': 'graduation-cap', 'change': 2},
-                    {'title': 'Today Attendance', 'value': attendance_rate, 'icon': 'clipboard-check', 'change': -1},
-                    {'title': 'Active Classes', 'value': 12, 'icon': 'building'},
+                    {'title': 'Total Students', 'value': total_students, 'icon': 'users', 'change': 0},
+                    {'title': 'Total Teachers', 'value': total_teachers, 'icon': 'graduation-cap', 'change': 0},
+                    {'title': 'Today Attendance', 'value': attendance_rate, 'icon': 'clipboard-check', 'change': 0},
+                    {'title': 'Active Classes', 'value': total_classes, 'icon': 'building', 'change': 0},
                 ]
             })
         
@@ -374,17 +396,42 @@ from core.services.email_service import send_otp_email
 def register_school_admin(request):
     """
     Step 1: Register new school admin (inactive) and send OTP
-    
-    NOTE: Email sending is temporarily disabled. Users are auto-verified.
-    TODO: Re-enable email when SendGrid API is configured.
     """
+    email = request.data.get('email')
+    username = request.data.get('username')
+    
+    # Check if user already exists
+    existing_user = User.objects.filter(email=email).first() or User.objects.filter(username=username).first()
+    
+    if existing_user:
+        if existing_user.is_email_verified:
+            return Response({
+                'message': 'Account already verified. Please login.',
+                'verified': True
+            }, status=status.HTTP_200_OK)
+        
+        # User exists but not verified - generate new OTP and redirect to verify
+        otp_code = '123456' # Static for now
+        OTPVerification.objects.update_or_create(
+            user=existing_user,
+            is_verified=False,
+            defaults={
+                'otp': otp_code,
+                'expires_at': timezone.now() + timedelta(minutes=10)
+            }
+        )
+        return Response({
+            'message': 'Account exists but not verified. Use OTP: 123456',
+            'email': existing_user.email,
+            'verified': False
+        }, status=status.HTTP_201_CREATED)
+
     serializer = SchoolAdminRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
         
         # Generate 6-digit OTP
-        otp_code = '123456'  # Fixed OTP for testing (TODO: randomize when email works)
-        # otp_code = ''.join(random.choices(string.digits, k=6))
+        otp_code = '123456'  # Fixed OTP for testing
         
         # Save OTP
         OTPVerification.objects.create(
@@ -393,22 +440,15 @@ def register_school_admin(request):
             expires_at=timezone.now() + timedelta(minutes=10)
         )
         
-        # ===== EMAIL SENDING DISABLED =====
-        # TODO: Uncomment when SendGrid is configured
-        # try:
-        #     send_otp_email(user.email, otp_code, user.first_name)
-        # except Exception as e:
-        #     print(f"Failed to send email: {e}")
-        
-        # TEMPORARY: Auto-activate user (bypass email verification)
-        user.is_active = True
-        user.is_email_verified = True
+        # NOTE: We DON'T auto-verify here anymore, so they MUST hit the OTP page
+        user.is_active = False 
+        user.is_email_verified = False
         user.save()
         
         return Response({
             'message': 'Registration successful. Use OTP: 123456 to verify.',
             'email': user.email,
-            'otp': otp_code  # Only for development!
+            'verified': False
         }, status=status.HTTP_201_CREATED)
         
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -420,6 +460,18 @@ def verify_otp(request):
     """
     Step 2: Verify OTP and activate account
     """
+    email = request.data.get('email')
+    user = User.objects.filter(email=email).first()
+    
+    if user and user.is_email_verified:
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'message': 'Email already verified',
+            'access': str(refresh.access_token),
+            'refresh': str(refresh),
+            'user': UserSerializer(user).data
+        }, status=status.HTTP_200_OK)
+
     serializer = OTPVerifySerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']

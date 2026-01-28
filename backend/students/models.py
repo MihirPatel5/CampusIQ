@@ -35,7 +35,11 @@ class StudentProfile(TenantAwareModel):
         blank=True,
         related_name='student_profile'
     )
-    admission_number = models.CharField(max_length=50, help_text="e.g., 'ADM2024001'")
+    admission_number = models.CharField(
+        max_length=50,
+        help_text="e.g., 'ADM2024001'",
+        db_index=True  # Add index for faster lookups
+    )
     first_name = models.CharField(max_length=100)
     middle_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100)

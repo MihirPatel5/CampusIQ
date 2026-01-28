@@ -83,7 +83,7 @@ class User(AbstractUser):
         return self.school_id == school.id if school else False
 
 
-class School(TimeStampedModel):
+class School(AuditModel):
     """
     School/Tenant model for multi-tenancy support.
     Replaces singleton SchoolProfile to support multiple schools.
@@ -120,13 +120,6 @@ class School(TimeStampedModel):
         help_text="Board affiliation (e.g., CBSE, ICSE)"
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-    updated_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='school_updates'
-    )
     
     class Meta:
         db_table = 'schools'

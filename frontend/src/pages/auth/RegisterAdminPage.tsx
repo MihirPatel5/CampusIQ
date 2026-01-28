@@ -42,8 +42,15 @@ export default function RegisterAdminPage() {
     const onSubmit = async (data: RegisterFormData) => {
         setIsLoading(true)
         try {
-            await authService.registerAdmin(data)
-            toast.success('Registration successful! Please check your email for the verification code.')
+            const response = await authService.registerAdmin(data)
+
+            if (response.verified) {
+                toast.info('Account already verified. Please sign in.')
+                navigate('/login')
+                return
+            }
+
+            toast.success('Registration successful! Use OTP: 123456 to verify your email.')
             // Navigate to OTP page with email in state
             navigate('/verify-otp', { state: { email: data.email } })
         } catch (error) {

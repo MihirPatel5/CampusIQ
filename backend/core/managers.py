@@ -4,6 +4,9 @@ Automatically filters queries by current tenant (school) context.
 """
 from django.db import models
 from .tenant import TenantContext
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TenantQuerySet(models.QuerySet):
@@ -47,14 +50,17 @@ class TenantManager(models.Manager):
         """
         queryset = TenantQuerySet(self.model, using=self._db)
         tenant = TenantContext.get_current_tenant()
-        print(f"DEBUG: TenantManager - Model: {self.model.__name__}, Tenant: {tenant}")
-        
-        # Super admin sees all data
-        if tenant is None:
-            return queryset
+        logger.debug(f"TenantManager - Model: {self.model.__name__}, Tenant: {tenant}")
         
         # Filter by current school
-        return queryset.filter(school=tenant)
+        if tenant:
+            return queryset.filter(school=tenant)
+            
+        # If not super admin context and no tenant, return empty
+        if not TenantContext.is_super_admin_context():
+            return queryset.none()
+            
+        return queryset
     
     def all_tenants(self):
         """

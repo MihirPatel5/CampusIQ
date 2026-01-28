@@ -1,0 +1,3 @@
+# Ignore log files - these are generated at runtime
+*.log
+campus_iq.log

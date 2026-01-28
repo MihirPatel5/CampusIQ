@@ -80,7 +80,7 @@ export default function OTPVerificationPage() {
                     </div>
                     <CardTitle className="text-2xl text-center">Verify your Email</CardTitle>
                     <CardDescription className="text-center">
-                        We've sent a 6-digit verification code to <span className="font-medium text-foreground">{email}</span>
+                        Please enter the 6-digit verification code. (For testing use <span className="font-bold text-primary">123456</span>)
                     </CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmit(onSubmit)}>

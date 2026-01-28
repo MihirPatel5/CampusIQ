@@ -28,7 +28,7 @@ export const authService = {
     return response.data
   },
 
-  async registerAdmin(data: any): Promise<{ message: string; email: string }> {
+  async registerAdmin(data: any): Promise<{ message: string; email: string; verified?: boolean }> {
     const response = await api.post(API_ENDPOINTS.REGISTER_ADMIN, data)
     return response.data
   },

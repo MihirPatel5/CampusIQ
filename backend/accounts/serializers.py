@@ -6,12 +6,60 @@ from .models import User, School, TeacherProfile, OTPVerification
 from datetime import date
 
 
+class PublicSchoolSerializer(serializers.ModelSerializer):
+    """Serializer for public school listing (limited fields)"""
+    
+    class Meta:
+        model = School
+        fields = ['id', 'name', 'logo', 'city', 'state']
+
+
+class SchoolSerializer(serializers.ModelSerializer):
+    """Serializer for School (multi-tenant)"""
+    admin_email = serializers.EmailField(write_only=True, required=False)
+    admin_username = serializers.CharField(write_only=True, required=False)
+    admin_password = serializers.CharField(write_only=True, required=False)
+    
+    class Meta:
+        model = School
+        fields = [
+            'id', 'name', 'code', 'logo', 'school_verification_code', 'address',
+            'city', 'state', 'pincode', 'phone', 'email', 'website', 
+            'established_year', 'affiliation', 'status',
+            'created_at', 'updated_at',
+            'admin_email', 'admin_username', 'admin_password'
+        ]
+        read_only_fields = ['id', 'code', 'school_verification_code', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        admin_email = validated_data.pop('admin_email', None)
+        admin_username = validated_data.pop('admin_username', None)
+        admin_password = validated_data.pop('admin_password', None)
+        
+        school = super().create(validated_data)
+        
+        # Create school admin if details provided
+        if admin_email and admin_username and admin_password:
+            from .models import User
+            User.objects.create_user(
+                username=admin_username,
+                email=admin_email,
+                password=admin_password,
+                role='admin',
+                school=school,
+                is_active=True
+            )
+            
+        return school
+
+
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
+    school = SchoolSerializer(read_only=True)
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'is_active', 'date_joined']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'school', 'is_active', 'date_joined']
         read_only_fields = ['id', 'date_joined']
 
 
@@ -198,6 +246,14 @@ class TeacherCreateSerializer(serializers.ModelSerializer):
         return teacher_profile
 
 
+class PublicSchoolSerializer(serializers.ModelSerializer):
+    """Serializer for public school listing (limited fields)"""
+    
+    class Meta:
+        model = School
+        fields = ['id', 'name', 'logo', 'city', 'state']
+
+
 class SchoolSerializer(serializers.ModelSerializer):
     """Serializer for School (multi-tenant)"""
     admin_email = serializers.EmailField(write_only=True, required=False)
@@ -234,14 +290,6 @@ class SchoolSerializer(serializers.ModelSerializer):
             )
             
         return school
-
-
-class PublicSchoolSerializer(serializers.ModelSerializer):
-    """Serializer for public school listing (limited fields)"""
-    
-    class Meta:
-        model = School
-        fields = ['id', 'name', 'logo', 'city', 'state']
 
 
 class SchoolAdminRegistrationSerializer(serializers.ModelSerializer):
