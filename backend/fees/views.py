@@ -138,9 +138,23 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         # Super admin sees all invoices
         if user.is_super_admin():
             pass
-        # School admin/Teacher/Parent sees only their school's invoices
-        elif user.school:
-            queryset = queryset.filter(school=user.school)
+        # School admin sees all school invoices
+        elif user.role in ['admin', 'super_admin']:
+            if user.school:
+                queryset = queryset.filter(school=user.school)
+        # Teacher: No access to invoices usually, or specific perm? Assuming school level for now or none
+        elif user.role == 'teacher':
+             # Teachers usually don't see financial data unless auth matches specific perm.
+             # For safety, restricting to school but maybe none?
+             # Let's stick to school for now if they have permission to view.
+             if user.school:
+                queryset = queryset.filter(school=user.school)
+        # Student sees only their own
+        elif user.role == 'student':
+            queryset = queryset.filter(student__user=user)
+        # Parent sees only their children's
+        elif user.role == 'parent':
+            queryset = queryset.filter(student__parents__user=user)
         else:
             queryset = queryset.none()
         
@@ -175,7 +189,17 @@ class PaymentViewSet(viewsets.ModelViewSet):
         # Super admin sees all payments
         if user.is_super_admin():
             pass
-        # School admin/Teacher/Parent sees only their school's payments
+        # School admin sees all school payments
+        elif user.role in ['admin', 'super_admin']:
+             if user.school:
+                queryset = queryset.filter(invoice__school=user.school)
+        # Student sees only their own
+        elif user.role == 'student':
+            queryset = queryset.filter(invoice__student__user=user)
+        # Parent sees only their children's
+        elif user.role == 'parent':
+            queryset = queryset.filter(invoice__student__parents__user=user)
+        # Fallback for school staff
         elif user.school:
             queryset = queryset.filter(invoice__school=user.school)
         else:

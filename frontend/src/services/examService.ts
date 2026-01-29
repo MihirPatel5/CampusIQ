@@ -34,6 +34,23 @@ export const examService = {
         await api.patch(`${API_ENDPOINTS.EXAMS}${id}/publish/`)
     },
 
+    // Exam Schedules
+    async getExamSchedules(params?: any): Promise<any[]> {
+        const response = await api.get<any>(API_ENDPOINTS.EXAM_SCHEDULES, { params })
+        return Array.isArray(response.data) ? response.data : (response.data.results || [])
+    },
+    async createExamSchedule(data: any): Promise<any> {
+        const response = await api.post(API_ENDPOINTS.EXAM_SCHEDULES, data)
+        return response.data
+    },
+    async updateExamSchedule(id: number, data: any): Promise<any> {
+        const response = await api.patch(`${API_ENDPOINTS.EXAM_SCHEDULES}${id}/`, data)
+        return response.data
+    },
+    async deleteExamSchedule(id: number): Promise<void> {
+        await api.delete(`${API_ENDPOINTS.EXAM_SCHEDULES}${id}/`)
+    },
+
     // Results
     async getResults(params?: any): Promise<Result[]> {
         const response = await api.get<any>(API_ENDPOINTS.EXAM_RESULTS, { params })

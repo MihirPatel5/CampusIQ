@@ -70,6 +70,7 @@ export const API_ENDPOINTS = {
 
   // Exams
   EXAMS: '/exams/',
+  EXAM_SCHEDULES: '/exam-schedules/',
   EXAM_RESULTS: '/exams/results/',
   BULK_RESULT_ENTRY: '/exams/results/bulk-entry/',
   STUDENT_REPORT_CARD: (examId: number, studentId: number) => `/exams/${examId}/report-card/${studentId}/`,

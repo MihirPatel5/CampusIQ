@@ -4,10 +4,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsAdmin, IsActiveTeacher
 from django.db.models import Sum, Avg
-from .models import Exam, ExamResult
+from .models import Exam, ExamResult, ExamSchedule
 from students.models import StudentProfile
 from .serializers import (
-    ExamSerializer, ExamResultSerializer, BulkResultEntrySerializer, StudentReportCardSerializer
+    ExamSerializer, ExamResultSerializer, BulkResultEntrySerializer, StudentReportCardSerializer,
+    ExamScheduleSerializer
 )
 
 
@@ -206,9 +207,20 @@ class ExamResultViewSet(viewsets.ModelViewSet):
         # Super admin sees all results
         if user.is_super_admin():
             pass
-        # School admin/Teacher/Parent sees only their school's results
-        elif user.school:
-            queryset = queryset.filter(school=user.school)
+        # School admin sees all school results
+        elif user.role in ['admin', 'super_admin']:
+             if user.school:
+                queryset = queryset.filter(school=user.school)
+        # Teacher sees all results in their school
+        elif user.role == 'teacher':
+             if user.school:
+                queryset = queryset.filter(school=user.school)
+        # Student sees only their own
+        elif user.role == 'student':
+            queryset = queryset.filter(student__user=user)
+        # Parent sees only their children's
+        elif user.role == 'parent':
+            queryset = queryset.filter(student__parents__user=user)
         else:
             queryset = queryset.none()
         
@@ -231,3 +243,25 @@ class ExamResultViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(entered_by=self.request.user)
+
+
+class ExamScheduleViewSet(viewsets.ModelViewSet):
+    """ViewSet for ExamSchedule management"""
+    queryset = ExamSchedule.objects.select_related('exam', 'subject').all()
+    serializer_class = ExamScheduleSerializer
+    ordering = ['date', 'start_time']
+    
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdmin()]
+        return [IsAuthenticated()]
+    
+    def get_queryset(self):
+        queryset = ExamSchedule.objects.select_related('exam', 'subject').all()
+        
+        # Filter by exam
+        exam_id = self.request.query_params.get('exam_id')
+        if exam_id:
+            queryset = queryset.filter(exam_id=exam_id)
+            
+        return queryset

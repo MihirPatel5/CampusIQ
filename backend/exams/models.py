@@ -28,6 +28,13 @@ class Exam(TenantAwareModel):
     start_date = models.DateField(null=True, blank=True)
     end_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    class_obj = models.ForeignKey(
+        'academic.Class',
+        on_delete=models.CASCADE,
+        related_name='exams',
+        null=True,
+        blank=True
+    )
     
     class Meta:
         db_table = 'exams'
@@ -36,11 +43,47 @@ class Exam(TenantAwareModel):
         indexes = [
             models.Index(fields=['school', 'academic_year']),
             models.Index(fields=['status']),
+            models.Index(fields=['class_obj']),
         ]
         ordering = ['-start_date']
     
     def __str__(self):
         return f"{self.name} ({self.academic_year}) - {self.school.name}"
+
+
+class ExamSchedule(TimeStampedModel):
+    """
+    Schedule for specific subjects in an exam
+    """
+    exam = models.ForeignKey(
+        Exam,
+        on_delete=models.CASCADE,
+        related_name='schedules'
+    )
+    subject = models.ForeignKey(
+        'academic.Subject',
+        on_delete=models.CASCADE,
+        related_name='exam_schedules'
+    )
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    max_marks = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('100.00'),
+        validators=[MinValueValidator(Decimal('0.00'))]
+    )
+
+    class Meta:
+        db_table = 'exam_schedules'
+        verbose_name = 'Exam Schedule'
+        verbose_name_plural = 'Exam Schedules'
+        unique_together = ['exam', 'subject']
+        ordering = ['date', 'start_time']
+
+    def __str__(self):
+        return f"{self.exam.name} - {self.subject.name}"
 
 
 class ExamResult(TimeStampedModel):

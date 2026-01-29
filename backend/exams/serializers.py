@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Exam, ExamResult
+from .models import Exam, ExamResult, ExamSchedule
 from students.models import StudentProfile
 from academic.models import Subject
 
@@ -10,10 +10,23 @@ class ExamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
         fields = [
-            'id', 'name', 'exam_type', 'academic_year', 'start_date',
+            'id', 'name', 'exam_type', 'academic_year', 'class_obj', 'start_date',
             'end_date', 'status', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ExamScheduleSerializer(serializers.ModelSerializer):
+    """Serializer for ExamSchedule"""
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    
+    class Meta:
+        model = ExamSchedule
+        fields = [
+            'id', 'exam', 'subject', 'subject_name', 'date', 
+            'start_time', 'end_time', 'max_marks', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
 
 
 class ExamResultSerializer(serializers.ModelSerializer):

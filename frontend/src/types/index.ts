@@ -371,11 +371,23 @@ export interface Exam {
   name: string
   exam_type: string
   academic_year: string
-  class_obj: number
+  class_obj?: number
   start_date: string
   end_date: string
   status: ExamStatus
   description?: string
+  created_at: string
+}
+
+export interface ExamSchedule {
+  id: number
+  exam: number
+  subject: number
+  subject_name: string
+  date: string
+  start_time: string
+  end_time: string
+  max_marks: number
   created_at: string
 }
 
