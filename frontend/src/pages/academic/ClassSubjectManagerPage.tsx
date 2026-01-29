@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, BookOpen, User, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, BookOpen, User, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { academicService } from '@/services/academicService'
 import { teacherService } from '@/services/teacherService'
 import { getErrorMessage } from '@/services/api'
 import type { Class, Section, Subject, Teacher, SubjectAssignment } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
     Dialog,
