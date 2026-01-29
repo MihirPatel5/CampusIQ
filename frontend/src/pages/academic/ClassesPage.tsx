@@ -510,6 +510,14 @@ export default function ClassesPage() {
                                             >
                                                 Manage Students
                                             </Button>
+                                            <Button
+                                                variant="link"
+                                                className="h-auto p-0 text-primary font-bold ml-4"
+                                                size="sm"
+                                                onClick={() => navigate(`/classes/${viewingSectionsClass?.id}/sections/${section.id}/subjects`)}
+                                            >
+                                                Manage Subjects
+                                            </Button>
                                         </div>
                                     </CardContent>
                                 </Card>

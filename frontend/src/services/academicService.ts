@@ -56,8 +56,13 @@ export const academicService = {
   },
 
   // Subject Assignments
-  async getSubjectAssignments(): Promise<SubjectAssignment[]> {
-    const response = await api.get<any>(API_ENDPOINTS.SUBJECT_ASSIGNMENTS)
+  async getSubjectAssignments(params?: {
+    class_id?: number
+    section_id?: number
+    teacher_id?: number
+    academic_year?: string
+  }): Promise<SubjectAssignment[]> {
+    const response = await api.get<any>(API_ENDPOINTS.SUBJECT_ASSIGNMENTS, { params })
     return Array.isArray(response.data) ? response.data : (response.data.results || [])
   },
   async createSubjectAssignment(data: Partial<SubjectAssignment>): Promise<SubjectAssignment> {

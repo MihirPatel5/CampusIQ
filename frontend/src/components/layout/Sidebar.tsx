@@ -93,7 +93,7 @@ export function Sidebar() {
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: 'auto' }}
                 exit={{ opacity: 0, width: 0 }}
-                className="font-display font-bold text-lg text-sidebar-foreground whitespace-nowrap overflow-hidden"
+                className="font-display font-bold text-lg text-sidebar-foreground whitespace-nowrap overflow-hidden text-ellipsis max-w-[170px]"
               >
                 {user?.school?.name || 'School ERP'}
               </motion.span>

@@ -81,27 +81,11 @@ export default function ClassTimetableManagerPage() {
             setLoading(true)
             const [entriesData, assignmentsData] = await Promise.all([
                 timetableService.getTimetable({ class_id: classId, section_id: sectionId }),
-                // We filter assignments by class and section to only show valid options
-                academicService.getSubjectAssignments() // This fetches ALL, might need filtering param from backend optimisation later
+                academicService.getSubjectAssignments({ class_id: classId, section_id: sectionId })
             ])
 
-            // Filter assignments client-side for now if backend doesn't support params nicely or returns all
-            // Actually `getSubjectAssignments` doesn't take params in service yet?
-            // Wait, `SubjectAssignmentViewSet` supports `class_id` and `section_id` filter via query params!
-            // But `academicService.getSubjectAssignments` implementation in service file didn't seem to pass params?
-            // Let's check `academicService`. It uses `api.get` without params arg in the definition I saw earlier.
-            // Ah, I should fix `academicService` or just filter locally. Since dataset might be small for demo, local filter is ok.
-            // But for better practice, let's filter locally for now since I can't easily edit academicService without another reading.
-            // Wait, I CAN edit academicService. But let's stick to local filter to be safe/fast or re-read service.
-            // Re-reading service (Step 2697): `getSubjectAssignments` takes NO args.
-            // So I'll filter locally.
-
-            const relevantAssignments = assignmentsData.filter(
-                a => a.class_obj === classId && a.section === sectionId && a.status === 'active'
-            )
-
             setTimetableEntries(entriesData)
-            setAssignments(relevantAssignments)
+            setAssignments(assignmentsData)
         } catch (error) {
             toast.error('Failed to load timetable')
             console.error(error)
