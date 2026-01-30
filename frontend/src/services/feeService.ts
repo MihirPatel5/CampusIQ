@@ -46,6 +46,18 @@ export const feeService = {
         const response = await api.post<Payment>(API_ENDPOINTS.PAYMENTS, data)
         return response.data
     },
+
+    async getFamilyPendingInvoices(parentId: number): Promise<Invoice[]> {
+        const response = await api.get<Invoice[]>(API_ENDPOINTS.INVOICES_FAMILY_PENDING, {
+            params: { parent_id: parentId }
+        })
+        return response.data
+    },
+
+    async bulkRecordPayment(data: { payments: any[] }) {
+        const response = await api.post(API_ENDPOINTS.PAYMENTS_BULK_RECORD, data)
+        return response.data
+    },
 }
 
 export default feeService

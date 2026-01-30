@@ -76,6 +76,23 @@ export const academicService = {
   async deleteSubjectAssignment(id: number): Promise<void> {
     await api.delete(`${API_ENDPOINTS.SUBJECT_ASSIGNMENTS}${id}/`)
   },
+
+  // Classrooms
+  async getClassRooms(): Promise<any[]> {
+    const response = await api.get<any>(API_ENDPOINTS.CLASS_ROOMS)
+    return Array.isArray(response.data) ? response.data : (response.data.results || [])
+  },
+  async createClassRoom(data: any): Promise<any> {
+    const response = await api.post(API_ENDPOINTS.CLASS_ROOMS, data)
+    return response.data
+  },
+  async updateClassRoom(id: number, data: any): Promise<any> {
+    const response = await api.patch(`${API_ENDPOINTS.CLASS_ROOMS}${id}/`, data)
+    return response.data
+  },
+  async deleteClassRoom(id: number): Promise<void> {
+    await api.delete(`${API_ENDPOINTS.CLASS_ROOMS}${id}/`)
+  },
 }
 
 export default academicService

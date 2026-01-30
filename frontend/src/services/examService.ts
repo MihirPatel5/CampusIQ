@@ -64,6 +64,11 @@ export const examService = {
         const response = await api.get(API_ENDPOINTS.STUDENT_REPORT_CARD(examId, studentId))
         return response.data
     },
+
+    async getConsolidatedResults(examId: number) {
+        const response = await api.get(API_ENDPOINTS.CONSOLIDATED_RESULTS(examId))
+        return response.data
+    },
 }
 
 export default examService

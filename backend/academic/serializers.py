@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
-from .models import Class, Section, Subject, SubjectAssignment, Period, TimetableEntry
+from .models import Class, Section, Subject, SubjectAssignment, Period, TimetableEntry, ClassRoom
 from accounts.models import TeacherProfile
 
 
@@ -147,6 +147,14 @@ class SectionSerializer(serializers.ModelSerializer):
         return obj.has_capacity()
 
 
+class ClassRoomSerializer(serializers.ModelSerializer):
+    """Serializer for ClassRoom model"""
+    class Meta:
+        model = ClassRoom
+        fields = ['id', 'name', 'capacity', 'location', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
 class SubjectSerializer(serializers.ModelSerializer):
     """Serializer for Subject model"""
     
@@ -223,9 +231,12 @@ class TimetableEntrySerializer(serializers.ModelSerializer):
             'id', 'class_obj', 'class_name', 'section', 'section_name',
             'day_of_week', 'period', 'period_name', 'period_time',
             'subject', 'subject_name', 'teacher', 'teacher_name',
+            'room', 'room_name',
             'academic_year', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+
+    room_name = serializers.CharField(source='room.name', read_only=True)
 
     def get_period_time(self, obj):
         return f"{obj.period.start_time.strftime('%H:%M')} - {obj.period.end_time.strftime('%H:%M')}"

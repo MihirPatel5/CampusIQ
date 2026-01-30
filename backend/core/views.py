@@ -28,3 +28,67 @@ class TenantMixin:
         # Clear context after request is processed
         TenantContext.clear_tenant()
         return super().finalize_response(request, response, *args, **kwargs)
+
+from rest_framework import viewsets, permissions
+from .models import Event, NotificationSubscription
+from .serializers import EventSerializer, NotificationSubscriptionSerializer
+from django.db.models import Q
+from rest_framework.exceptions import PermissionDenied
+
+class EventViewSet(TenantMixin, viewsets.ModelViewSet):
+    """
+    ViewSet for scheduling and viewing events.
+    Enforces role-based visibility and creation logic.
+    """
+    serializer_class = EventSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        school = user.school
+        
+        if not school:
+            return Event.objects.none()
+
+        queryset = Event.objects.filter(school=school, is_active=True)
+
+        if user.role in ['admin', 'super_admin']:
+            return queryset
+        
+        elif user.role == 'teacher':
+            # Teachers see: Global + Staff + Any class targeted events
+            return queryset.filter(
+                Q(audience='global') | 
+                Q(audience='staff') | 
+                Q(audience='class')
+            )
+        
+        else:
+            # Students/Parents see: Global + Class specific
+            return queryset.filter(
+                Q(audience='global') | 
+                Q(audience='class')
+            )
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        audience = serializer.validated_data.get('audience', 'global')
+        
+        if audience in ['global', 'staff'] and user.role not in ['admin', 'super_admin']:
+            raise PermissionDenied("Only admins can create global or staff-only events.")
+        
+        serializer.save(created_by=user, school=user.school)
+
+
+class NotificationSubscriptionViewSet(TenantMixin, viewsets.ModelViewSet):
+    """
+    ViewSet for managing push notification tokens.
+    """
+    serializer_class = NotificationSubscriptionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return NotificationSubscription.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user, school=self.request.user.school)

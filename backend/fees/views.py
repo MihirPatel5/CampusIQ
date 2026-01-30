@@ -5,7 +5,8 @@ from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsAdmin
 from django.db.models import Sum
 from .models import FeeStructure, Invoice, Payment
-from students.models import StudentProfile
+from students.models import StudentProfile, ParentProfile
+from rest_framework.decorators import action
 from .serializers import (
     FeeStructureSerializer, InvoiceSerializer, PaymentSerializer, GenerateInvoicesSerializer
 )
@@ -131,44 +132,34 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         return [IsAuthenticated()]
     
-    def get_queryset(self):
-        user = self.request.user
-        queryset = Invoice.objects.select_related('student', 'fee_structure').all()
-        
-        # Super admin sees all invoices
-        if user.is_super_admin():
-            pass
-        # School admin sees all school invoices
-        elif user.role in ['admin', 'super_admin']:
-            if user.school:
-                queryset = queryset.filter(school=user.school)
-        # Teacher: No access to invoices usually, or specific perm? Assuming school level for now or none
-        elif user.role == 'teacher':
-             # Teachers usually don't see financial data unless auth matches specific perm.
-             # For safety, restricting to school but maybe none?
-             # Let's stick to school for now if they have permission to view.
-             if user.school:
-                queryset = queryset.filter(school=user.school)
-        # Student sees only their own
-        elif user.role == 'student':
-            queryset = queryset.filter(student__user=user)
-        # Parent sees only their children's
-        elif user.role == 'parent':
-            queryset = queryset.filter(student__parents__user=user)
-        else:
-            queryset = queryset.none()
-        
-        # Filter by student
-        student_id = self.request.query_params.get('student_id')
-        if student_id:
-            queryset = queryset.filter(student_id=student_id)
-        
-        # Filter by status
-        status_param = self.request.query_params.get('status')
-        if status_param:
-            queryset = queryset.filter(status=status_param)
-        
         return queryset
+
+    @action(detail=False, methods=['get'])
+    def family_pending(self, request):
+        """
+        Get all pending invoices for a family (all children of a parent)
+        GET /api/v1/fees/invoices/family_pending/?parent_id=1
+        """
+        parent_id = request.query_params.get('parent_id')
+        if not parent_id:
+            return Response({'error': 'parent_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            parent = ParentProfile.objects.get(id=parent_id, school=request.user.school)
+            # Find all students for this parent
+            students = StudentProfile.objects.filter(parents=parent)
+            
+            invoices = Invoice.objects.filter(
+                student__in=students, 
+                status__in=['pending', 'partial'],
+                school=request.user.school
+            ).select_related('student', 'fee_structure')
+            
+            serializer = self.get_serializer(invoices, many=True)
+            return Response(serializer.data)
+            
+        except ParentProfile.DoesNotExist:
+            return Response({'error': 'Parent not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
@@ -211,6 +202,57 @@ class PaymentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(invoice_id=invoice_id)
         
         return queryset
+
+    @action(detail=False, methods=['post'])
+    def bulk_record_payment(self, request):
+        """
+        Record payments for multiple invoices (e.g., family pay)
+        POST /api/v1/fees/payments/bulk_record_payment/
+        """
+        payments_data = request.data.get('payments', [])
+        if not payments_data:
+            return Response({'error': 'payments data is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        results = []
+        errors = []
+        
+        from django.db import transaction
+        from datetime import date
+        
+        try:
+            with transaction.atomic():
+                for pay_item in payments_data:
+                    invoice_id = pay_item.get('invoice_id')
+                    amount = pay_item.get('amount')
+                    payment_date = pay_item.get('payment_date', str(date.today()))
+                    payment_mode = pay_item.get('payment_mode', 'cash')
+                    
+                    try:
+                        invoice = Invoice.objects.get(id=invoice_id, school=request.user.school)
+                        
+                        # Generate receipt number
+                        payment_count = Payment.objects.count() + 1
+                        receipt_number = f"RCP-2026-{payment_count:05d}"
+                        
+                        payment = Payment.objects.create(
+                            invoice=invoice,
+                            receipt_number=receipt_number,
+                            amount=amount,
+                            payment_date=payment_date,
+                            payment_mode=payment_mode,
+                            created_by=request.user
+                        )
+                        results.append(receipt_number)
+                    except Invoice.DoesNotExist:
+                        errors.append(f"Invoice {invoice_id} not found")
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        return Response({
+            'message': f'Recorded {len(results)} payments',
+            'receipts': results,
+            'errors': errors
+        }, status=status.HTTP_201_CREATED)
     
     def perform_create(self, serializer):
         # Generate receipt number

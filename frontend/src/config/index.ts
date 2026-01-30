@@ -55,6 +55,7 @@ export const API_ENDPOINTS = {
   SUBJECT_ASSIGNMENTS: '/assignments/',
   PERIODS: '/periods/',
   TIMETABLE: '/timetable/',
+  CLASS_ROOMS: '/class-rooms/',
 
   // Attendance
   ATTENDANCE: '/attendance/',
@@ -62,11 +63,15 @@ export const API_ENDPOINTS = {
   ATTENDANCE_STUDENTS: '/attendance/students/',
   STUDENT_ATTENDANCE_HISTORY: (id: number) => `/attendance/student/${id}/`,
   ATTENDANCE_STATS: '/attendance/statistics/',
+  STAFF_ATTENDANCE: '/staff-attendance/',
+  STAFF_ATTENDANCE_MARK: '/attendance/staff-mark/',
 
   // Fees
   FEE_STRUCTURES: '/fees/structures/',
   INVOICES: '/fees/invoices/',
+  INVOICES_FAMILY_PENDING: '/fees/invoices/family_pending/',
   PAYMENTS: '/fees/payments/',
+  PAYMENTS_BULK_RECORD: '/fees/payments/bulk_record_payment/',
 
   // Exams
   EXAMS: '/exams/',
@@ -74,6 +79,7 @@ export const API_ENDPOINTS = {
   EXAM_RESULTS: '/exams/results/',
   BULK_RESULT_ENTRY: '/exams/results/bulk-entry/',
   STUDENT_REPORT_CARD: (examId: number, studentId: number) => `/exams/${examId}/report-card/${studentId}/`,
+  CONSOLIDATED_RESULTS: (id: number) => `/exams/${id}/consolidated_results/`,
 
   // School
   SCHOOLS: '/schools/',

@@ -23,13 +23,18 @@ const StudentAdmissionPage = lazy(() => import('./pages/students/StudentAdmissio
 const TeachersPage = lazy(() => import('./pages/teachers/TeachersPage'))
 const ClassesPage = lazy(() => import('./pages/academic/ClassesPage'))
 const SubjectsPage = lazy(() => import('./pages/academic/SubjectsPage'))
+const ManageRoomsPage = lazy(() => import('./pages/academic/ManageRoomsPage'))
 const AttendancePage = lazy(() => import('./pages/attendance/AttendancePage'))
 const ExamsPage = lazy(() => import('./pages/exams/ExamsPage'))
+const ConsolidatedResultsPage = lazy(() => import('./pages/exams/ConsolidatedResultsPage'))
 const FeesPage = lazy(() => import('./pages/fees/FeesPage'))
 const PeriodConfigurationPage = lazy(() => import('./pages/academic/PeriodConfigurationPage'))
 const ClassTimetableManagerPage = lazy(() => import('./pages/academic/ClassTimetableManagerPage'))
+const FeeCollectionPage = lazy(() => import('./pages/fees/FeeCollectionPage'))
 const ClassSubjectManagerPage = lazy(() => import('./pages/academic/ClassSubjectManagerPage'))
+const StaffAttendancePage = lazy(() => import('./pages/attendance/StaffAttendancePage'))
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
+const ManageEventsPage = lazy(() => import('./pages/events/ManageEventsPage'))
 
 function App() {
   return (
@@ -65,18 +70,22 @@ function App() {
 
                 <Route element={<ProtectedRoute allowedRoles={['admin', 'super_admin']} />}>
                   <Route path="/fees" element={<FeesPage />} />
+                  <Route path="/fees/collect" element={<FeeCollectionPage />} />
                 </Route>
 
                 <Route path="/students" element={<StudentsPage />} />
                 <Route path="/students/admission" element={<StudentAdmissionPage />} />
                 <Route path="/classes" element={<ClassesPage />} />
                 <Route path="/subjects" element={<SubjectsPage />} />
+                <Route path="/academic/rooms" element={<ManageRoomsPage />} />
                 <Route path="/academic/periods" element={<PeriodConfigurationPage />} />
                 <Route path="/attendance" element={<AttendancePage />} />
+                <Route path="/attendance/staff" element={<StaffAttendancePage />} />
                 <Route path="/exams" element={<ExamsPage />} />
+                <Route path="/exams/consolidated" element={<ConsolidatedResultsPage />} />
                 <Route path="/timetable" element={<ClassTimetableManagerPage />} />
                 <Route path="/classes/:classId/sections/:sectionId/subjects" element={<ClassSubjectManagerPage />} />
-                <Route path="/notices" element={<ComingSoon title="Notices" />} />
+                <Route path="/events" element={<ManageEventsPage />} />
                 <Route path="/library" element={<ComingSoon title="Library" />} />
                 <Route path="/transport" element={<ComingSoon title="Transport" />} />
                 <Route path="/settings" element={<SettingsPage />} />
