@@ -5,10 +5,10 @@ from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsAdmin, IsActiveTeacher
 from django.db.models import Count, Q
 from datetime import date, timedelta
-from .models import Attendance
 from academic.models import Section
 from students.models import StudentProfile
-from .serializers import AttendanceSerializer, BulkAttendanceSerializer, AttendanceStatsSerializer
+from .models import Attendance, StaffAttendance
+from .serializers import AttendanceSerializer, BulkAttendanceSerializer, AttendanceStatsSerializer, StaffAttendanceSerializer
 
 
 @api_view(['POST'])
@@ -228,3 +228,85 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(marked_by=self.request.user)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdmin])
+def mark_staff_attendance(request):
+    """
+    Mark attendance for multiple staff members
+    POST /api/v1/attendance/staff-mark/
+    """
+    attendance_date = request.data.get('date', str(date.today()))
+    attendance_records = request.data.get('attendance', [])
+    
+    created_count = 0
+    updated_count = 0
+    errors = []
+    
+    from accounts.models import User
+    
+    for record in attendance_records:
+        user_id = record.get('user_id')
+        attendance_status = record.get('status')
+        remarks = record.get('remarks', '')
+        
+        try:
+            target_user = User.objects.get(id=user_id, school=request.user.school)
+            
+            attendance, created = StaffAttendance.objects.update_or_create(
+                user=target_user,
+                date=attendance_date,
+                school=request.user.school,
+                defaults={
+                    'status': attendance_status,
+                    'remarks': remarks,
+                    'marked_by': request.user
+                }
+            )
+            
+            if created:
+                created_count += 1
+            else:
+                updated_count += 1
+                
+        except User.DoesNotExist:
+            errors.append(f"Staff member with ID {user_id} not found")
+        except Exception as e:
+            errors.append(f"Error for staff {user_id}: {str(e)}")
+            
+    return Response({
+        'message': 'Staff attendance marked successfully',
+        'created': created_count,
+        'updated': updated_count,
+        'errors': errors
+    }, status=status.HTTP_201_CREATED if created_count > 0 else status.HTTP_200_OK)
+
+
+class StaffAttendanceViewSet(viewsets.ModelViewSet):
+    """ViewSet for Staff Attendance management"""
+    queryset = StaffAttendance.objects.select_related('user', 'marked_by').all()
+    serializer_class = StaffAttendanceSerializer
+    permission_classes = [IsAuthenticated]
+    ordering = ['-date']
+    
+    def get_queryset(self):
+        user = self.request.user
+        queryset = StaffAttendance.objects.select_related('user', 'marked_by').all()
+        
+        if user.is_super_admin():
+            pass
+        elif user.school:
+            queryset = queryset.filter(school=user.school)
+        else:
+            queryset = queryset.none()
+            
+        # Filter by role
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(user__role=role)
+            
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(marked_by=self.request.user, school=self.request.user.school)

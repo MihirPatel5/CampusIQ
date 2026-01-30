@@ -65,3 +65,43 @@ class Attendance(TenantAwareModel):
     
     def __str__(self):
         return f"{self.student.get_full_name()} - {self.date} ({self.get_status_display()}) - {self.school.name}"
+
+
+class StaffAttendance(TenantAwareModel):
+    """
+    Daily attendance records for staff (Teachers, Admins) - Multi-tenant
+    """
+    STATUS_CHOICES = [
+        ('present', 'Present'),
+        ('absent', 'Absent'),
+        ('late', 'Late'),
+        ('leave', 'Leave'),
+    ]
+
+    user = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.CASCADE,
+        related_name='staff_attendance_records'
+    )
+    date = models.DateField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
+    remarks = models.TextField(blank=True)
+    marked_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.PROTECT,
+        related_name='marked_staff_attendance'
+    )
+
+    class Meta:
+        db_table = 'staff_attendance'
+        verbose_name = 'Staff Attendance'
+        verbose_name_plural = 'Staff Attendance Records'
+        unique_together = [('school', 'user', 'date')]
+        indexes = [
+            models.Index(fields=['school', 'user']),
+            models.Index(fields=['school', 'date']),
+        ]
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.date} ({self.get_status_display()}) - {self.school.name}"

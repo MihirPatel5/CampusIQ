@@ -196,6 +196,28 @@ class SubjectAssignment(TenantAwareModel):
             raise ValidationError('Subject must belong to the same school')
 
 
+class ClassRoom(TenantAwareModel):
+    """
+    Physical rooms in a school - Multi-tenant
+    """
+    name = models.CharField(max_length=100, help_text="e.g., 'Room 101', 'Science Lab'")
+    capacity = models.IntegerField(null=True, blank=True)
+    location = models.CharField(max_length=200, blank=True, help_text="e.g., 'Ground Floor, North Wing'")
+    status = models.CharField(max_length=20, default='active')
+
+    class Meta:
+        db_table = 'class_rooms'
+        verbose_name = 'Class Room'
+        verbose_name_plural = 'Class Rooms'
+        unique_together = [('school', 'name')]
+        indexes = [
+            models.Index(fields=['school', 'name']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} - {self.school.name}"
+
+
 class Period(TenantAwareModel):
     """
     Timetable periods definition for a school (e.g., "Period 1", "Morning Break").
@@ -262,6 +284,13 @@ class TimetableEntry(TenantAwareModel):
         on_delete=models.CASCADE,
         related_name='timetable_entries'
     )
+    room = models.ForeignKey(
+        ClassRoom,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='timetable_entries'
+    )
     academic_year = models.CharField(max_length=10, help_text="e.g., '2024-25'")
 
     class Meta:
@@ -312,3 +341,16 @@ class TimetableEntry(TenantAwareModel):
 
         if teacher_conflict:
             raise ValidationError(f"Teacher {self.teacher.user.get_full_name()} is already assigned to another class for this period.")
+
+        # 4. Check Room Availability (Conflict Detection)
+        if self.room:
+            room_conflict = TimetableEntry.objects.filter(
+                school=self.school_id,
+                room=self.room,
+                day_of_week=self.day_of_week,
+                period=self.period,
+                academic_year=self.academic_year
+            ).exclude(pk=self.pk).exists()
+
+            if room_conflict:
+                raise ValidationError(f"Room {self.room.name} is already occupied by another class for this period.")

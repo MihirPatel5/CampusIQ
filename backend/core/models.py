@@ -81,3 +81,81 @@ class TenantAwareModel(AuditModel):
         
         super().clean()
 
+
+class Event(TenantAwareModel):
+    """
+    School events, holidays, and meetings.
+    Supports targeted visibility for specific roles or classes.
+    """
+    AUDIENCE_CHOICES = [
+        ('global', 'Global (Everyone)'),
+        ('staff', 'Staff Only'),
+        ('class', 'Specific Class/Section'),
+    ]
+
+    TYPE_CHOICES = [
+        ('holiday', 'Holiday'),
+        ('meeting', 'Meeting'),
+        ('exam', 'Exam'),
+        ('celebration', 'Celebration'),
+        ('other', 'Other'),
+    ]
+
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    event_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='other')
+    audience = models.CharField(max_length=20, choices=AUDIENCE_CHOICES, default='global')
+    
+    # Target fields for CLASS_SPECIFIC audience
+    target_class = models.ForeignKey(
+        'academic.Class',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='events'
+    )
+    target_section = models.ForeignKey(
+        'academic.Section',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='events'
+    )
+
+    start_datetime = models.DateTimeField()
+    end_datetime = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'events'
+        ordering = ['-start_datetime']
+        indexes = [
+            models.Index(fields=['school', 'audience']),
+            models.Index(fields=['start_datetime']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.get_event_type_display()}) - {self.school.name}"
+
+
+class NotificationSubscription(TenantAwareModel):
+    """
+    Stores push notification tokens/subscriptions for users.
+    """
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notification_subscriptions'
+    )
+    endpoint = models.TextField(help_text="Push service endpoint or FCM token")
+    p256dh = models.CharField(max_length=255, null=True, blank=True, help_text="Web Push p256dh key")
+    auth = models.CharField(max_length=255, null=True, blank=True, help_text="Web Push auth key")
+    browser = models.CharField(max_length=50, blank=True)
+    device_type = models.CharField(max_length=50, blank=True)
+
+    class Meta:
+        db_table = 'notification_subscriptions'
+        unique_together = [('user', 'endpoint')]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.browser or 'Device'}"

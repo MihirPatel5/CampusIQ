@@ -4,10 +4,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsAdmin, IsActiveTeacher
 from django.db.models import Sum, Avg
-from .models import Exam, ExamResult
+from .models import Exam, ExamResult, ExamSchedule
 from students.models import StudentProfile
 from .serializers import (
-    ExamSerializer, ExamResultSerializer, BulkResultEntrySerializer, StudentReportCardSerializer
+    ExamSerializer, ExamResultSerializer, BulkResultEntrySerializer, StudentReportCardSerializer,
+    ExamScheduleSerializer
 )
 
 
@@ -62,6 +63,94 @@ class ExamViewSet(viewsets.ModelViewSet):
         exam.status = 'published'
         exam.save()
         return Response({'message': 'Exam results published successfully'})
+
+    @action(detail=True, methods=['get'])
+    def consolidated_results(self, request, pk=None):
+        """
+        Get consolidated result sheet for an exam (Class Wise)
+        GET /api/v1/exams/{id}/consolidated_results/
+        """
+        exam = self.get_object()
+        
+        # Get all active students in the class this exam belongs to
+        if not exam.class_obj:
+            return Response({'error': 'This exam is not linked to a specific class'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        students = StudentProfile.objects.filter(
+            class_obj=exam.class_obj,
+            status='active',
+            school=request.user.school
+        ).select_related('section', 'user')
+        
+        # Get all subjects for this exam from ExamSchedule
+        schedules = ExamSchedule.objects.filter(exam=exam).select_related('subject')
+        subjects = [s.subject for s in schedules]
+        
+        # Get all results for this exam
+        all_results = ExamResult.objects.filter(exam=exam, school=request.user.school)
+        
+        # Build marked map: {student_id: {subject_id: marks}}
+        result_map = {}
+        for res in all_results:
+            if res.student_id not in result_map:
+                result_map[res.student_id] = {}
+            result_map[res.student_id][res.subject_id] = {
+                'marks': res.marks_obtained,
+                'max': res.max_marks,
+                'grade': res.grade
+            }
+            
+        consolidated_data = []
+        for student in students:
+            student_marks = []
+            total_obtained = 0
+            total_max = 0
+            
+            for subject in subjects:
+                res = result_map.get(student.id, {}).get(subject.id)
+                if res:
+                    student_marks.append({
+                        'subject_id': subject.id,
+                        'subject_name': subject.name,
+                        'marks': res['marks'],
+                        'max': res['max'],
+                        'grade': res['grade']
+                    })
+                    total_obtained += res['marks']
+                    total_max += res['max']
+                else:
+                    student_marks.append({
+                        'subject_id': subject.id,
+                        'subject_name': subject.name,
+                        'marks': None,
+                        'max': None,
+                        'grade': 'N/A'
+                    })
+            
+            percentage = (total_obtained / total_max * 100) if total_max > 0 else 0
+            
+            consolidated_data.append({
+                'student_id': student.id,
+                'student_name': student.get_full_name(),
+                'admission_number': student.admission_number,
+                'section': student.section.name,
+                'marks': student_marks,
+                'total_obtained': total_obtained,
+                'total_max': total_max,
+                'percentage': round(percentage, 2)
+            })
+            
+        # Sort by total_obtained descending for ranking
+        consolidated_data.sort(key=lambda x: x['total_obtained'], reverse=True)
+        for i, entry in enumerate(consolidated_data):
+            entry['rank'] = i + 1
+            
+        return Response({
+            'exam_name': exam.name,
+            'class_name': exam.class_obj.name,
+            'subjects': [{'id': s.id, 'name': s.name} for s in subjects],
+            'results': consolidated_data
+        })
 
 
 @api_view(['POST'])
@@ -206,9 +295,20 @@ class ExamResultViewSet(viewsets.ModelViewSet):
         # Super admin sees all results
         if user.is_super_admin():
             pass
-        # School admin/Teacher/Parent sees only their school's results
-        elif user.school:
-            queryset = queryset.filter(school=user.school)
+        # School admin sees all school results
+        elif user.role in ['admin', 'super_admin']:
+             if user.school:
+                queryset = queryset.filter(school=user.school)
+        # Teacher sees all results in their school
+        elif user.role == 'teacher':
+             if user.school:
+                queryset = queryset.filter(school=user.school)
+        # Student sees only their own
+        elif user.role == 'student':
+            queryset = queryset.filter(student__user=user)
+        # Parent sees only their children's
+        elif user.role == 'parent':
+            queryset = queryset.filter(student__parents__user=user)
         else:
             queryset = queryset.none()
         
@@ -231,3 +331,25 @@ class ExamResultViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(entered_by=self.request.user)
+
+
+class ExamScheduleViewSet(viewsets.ModelViewSet):
+    """ViewSet for ExamSchedule management"""
+    queryset = ExamSchedule.objects.select_related('exam', 'subject').all()
+    serializer_class = ExamScheduleSerializer
+    ordering = ['date', 'start_time']
+    
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdmin()]
+        return [IsAuthenticated()]
+    
+    def get_queryset(self):
+        queryset = ExamSchedule.objects.select_related('exam', 'subject').all()
+        
+        # Filter by exam
+        exam_id = self.request.query_params.get('exam_id')
+        if exam_id:
+            queryset = queryset.filter(exam_id=exam_id)
+            
+        return queryset

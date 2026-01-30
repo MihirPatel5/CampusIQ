@@ -5,6 +5,8 @@ import { PublicRoute } from './components/auth/PublicRoute'
 import { MainLayout } from './components/layout/MainLayout'
 import { AuthLayout } from './components/layout/AuthLayout'
 import { LoadingScreen } from './components/ui/loading-screen'
+import { ErrorBoundary } from './components/layout/ErrorBoundary'
+import { LoadingProvider } from './contexts/LoadingContext'
 
 // Lazy load pages for better performance
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
@@ -21,70 +23,82 @@ const StudentAdmissionPage = lazy(() => import('./pages/students/StudentAdmissio
 const TeachersPage = lazy(() => import('./pages/teachers/TeachersPage'))
 const ClassesPage = lazy(() => import('./pages/academic/ClassesPage'))
 const SubjectsPage = lazy(() => import('./pages/academic/SubjectsPage'))
+const ManageRoomsPage = lazy(() => import('./pages/academic/ManageRoomsPage'))
 const AttendancePage = lazy(() => import('./pages/attendance/AttendancePage'))
 const ExamsPage = lazy(() => import('./pages/exams/ExamsPage'))
+const ConsolidatedResultsPage = lazy(() => import('./pages/exams/ConsolidatedResultsPage'))
 const FeesPage = lazy(() => import('./pages/fees/FeesPage'))
 const PeriodConfigurationPage = lazy(() => import('./pages/academic/PeriodConfigurationPage'))
 const ClassTimetableManagerPage = lazy(() => import('./pages/academic/ClassTimetableManagerPage'))
+const FeeCollectionPage = lazy(() => import('./pages/fees/FeeCollectionPage'))
 const ClassSubjectManagerPage = lazy(() => import('./pages/academic/ClassSubjectManagerPage'))
+const StaffAttendancePage = lazy(() => import('./pages/attendance/StaffAttendancePage'))
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
+const ManageEventsPage = lazy(() => import('./pages/events/ManageEventsPage'))
 
 function App() {
   return (
-    <Suspense fallback={<LoadingScreen />}>
-      <Routes>
-        {/* Public Routes */}
-        <Route element={<PublicRoute />}>
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register/teacher" element={<TeacherRegistrationPage />} />
-            <Route path="/register-admin" element={<RegisterAdminPage />} />
-            <Route path="/verify-otp" element={<OTPVerificationPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          </Route>
-        </Route>
-
-        {/* Protected Routes */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/schools/onboard" element={<CreateSchoolFlow />} />
-          <Route element={<MainLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-
-            {/* Admin routes */}
-            <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
-              <Route path="/schools" element={<SchoolsPage />} />
+    <ErrorBoundary>
+      <LoadingProvider>
+        <Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            {/* Public Routes */}
+            <Route element={<PublicRoute />}>
+              <Route element={<AuthLayout />}>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register/teacher" element={<TeacherRegistrationPage />} />
+                <Route path="/register-admin" element={<RegisterAdminPage />} />
+                <Route path="/verify-otp" element={<OTPVerificationPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              </Route>
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={['admin', 'super_admin']} />}>
-              <Route path="/teachers" element={<TeachersPage />} />
+            {/* Protected Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/schools/onboard" element={<CreateSchoolFlow />} />
+              <Route element={<MainLayout />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+
+                {/* Admin routes */}
+                <Route element={<ProtectedRoute allowedRoles={['super_admin']} />}>
+                  <Route path="/schools" element={<SchoolsPage />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedRoles={['admin', 'super_admin']} />}>
+                  <Route path="/teachers" element={<TeachersPage />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedRoles={['admin', 'super_admin']} />}>
+                  <Route path="/fees" element={<FeesPage />} />
+                  <Route path="/fees/collect" element={<FeeCollectionPage />} />
+                </Route>
+
+                <Route path="/students" element={<StudentsPage />} />
+                <Route path="/students/admission" element={<StudentAdmissionPage />} />
+                <Route path="/classes" element={<ClassesPage />} />
+                <Route path="/subjects" element={<SubjectsPage />} />
+                <Route path="/academic/rooms" element={<ManageRoomsPage />} />
+                <Route path="/academic/periods" element={<PeriodConfigurationPage />} />
+                <Route path="/attendance" element={<AttendancePage />} />
+                <Route path="/attendance/staff" element={<StaffAttendancePage />} />
+                <Route path="/exams" element={<ExamsPage />} />
+                <Route path="/exams/consolidated" element={<ConsolidatedResultsPage />} />
+                <Route path="/timetable" element={<ClassTimetableManagerPage />} />
+                <Route path="/classes/:classId/sections/:sectionId/subjects" element={<ClassSubjectManagerPage />} />
+                <Route path="/events" element={<ManageEventsPage />} />
+                <Route path="/library" element={<ComingSoon title="Library" />} />
+                <Route path="/transport" element={<ComingSoon title="Transport" />} />
+                <Route path="/settings" element={<SettingsPage />} />
+              </Route>
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={['admin', 'super_admin']} />}>
-              <Route path="/fees" element={<FeesPage />} />
-            </Route>
-
-            <Route path="/students" element={<StudentsPage />} />
-            <Route path="/students/admission" element={<StudentAdmissionPage />} />
-            <Route path="/classes" element={<ClassesPage />} />
-            <Route path="/subjects" element={<SubjectsPage />} />
-            <Route path="/subjects" element={<SubjectsPage />} />
-            <Route path="/academic/periods" element={<PeriodConfigurationPage />} />
-            <Route path="/attendance" element={<AttendancePage />} />
-            <Route path="/exams" element={<ExamsPage />} />
-            <Route path="/timetable" element={<ClassTimetableManagerPage />} />
-            <Route path="/classes/:classId/sections/:sectionId/subjects" element={<ClassSubjectManagerPage />} />
-            <Route path="/notices" element={<ComingSoon title="Notices" />} />
-            <Route path="/library" element={<ComingSoon title="Library" />} />
-            <Route path="/transport" element={<ComingSoon title="Transport" />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Route>
-        </Route>
-
-        {/* Redirects */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </Suspense>
+            {/* Redirects */}
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </Suspense>
+      </LoadingProvider>
+    </ErrorBoundary>
   )
 }
 

@@ -98,7 +98,29 @@ class StudentViewSet(TenantMixin, viewsets.ModelViewSet):
         user = self.request.user
         queryset = StudentProfile.objects.select_related('user', 'class_obj', 'section').prefetch_related('parents').all()
         
-        # Note: TenantManager handles school filtering automatically
+        # TenantManager handles generic school filtering, but we need stricter role filtering
+        
+        # Super admin sees all (TenantMixin helps, but explicitly:)
+        if user.is_super_admin():
+            pass # TenantCtx might still filter if set to None? TenantMixin handles logic.
+            # Usually strict filter is better:
+            
+        elif user.role in ['admin', 'teacher']:
+             # Already scoped by TenantMixin usually, but lets be sure
+             if user.school:
+                 queryset = queryset.filter(user__school=user.school)
+                 
+        elif user.role == 'student':
+             # Only see self
+             queryset = queryset.filter(user=user)
+             
+        elif user.role == 'parent':
+             # Only see own children
+             queryset = queryset.filter(parents__user=user)
+        
+        else:
+             # Unknown role
+             queryset = queryset.none()
         
         # Filter by class
         class_id = self.request.query_params.get('class_id')

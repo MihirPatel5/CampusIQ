@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Attendance
+from .models import Attendance, StaffAttendance
 from students.models import StudentProfile
 from datetime import date
 
@@ -58,3 +58,17 @@ class AttendanceStatsSerializer(serializers.Serializer):
     late_days = serializers.IntegerField()
     leave_days = serializers.IntegerField()
     attendance_percentage = serializers.FloatField()
+
+
+class StaffAttendanceSerializer(serializers.ModelSerializer):
+    """Serializer for StaffAttendance"""
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_role = serializers.CharField(source='user.get_role_display', read_only=True)
+
+    class Meta:
+        model = StaffAttendance
+        fields = [
+            'id', 'user', 'user_name', 'user_role', 'date',
+            'status', 'remarks', 'marked_by', 'created_at'
+        ]
+        read_only_fields = ['id', 'marked_by', 'created_at']

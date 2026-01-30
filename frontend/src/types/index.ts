@@ -346,6 +346,8 @@ export interface Invoice {
   due_date: string
   status: PaymentStatus
   installment?: number
+  class_name?: string
+  fee_items?: any[]
   created_at: string
 }
 
@@ -369,13 +371,26 @@ export type ExamStatus = 'draft' | 'active' | 'completed' | 'published'
 export interface Exam {
   id: number
   name: string
+  title: string
   exam_type: string
   academic_year: string
-  class_obj: number
+  class_obj?: number
   start_date: string
   end_date: string
   status: ExamStatus
   description?: string
+  created_at: string
+}
+
+export interface ExamSchedule {
+  id: number
+  exam: number
+  subject: number
+  subject_name: string
+  date: string
+  start_time: string
+  end_time: string
+  max_marks: number
   created_at: string
 }
 
@@ -450,6 +465,39 @@ export interface TimetableEntry {
   subject_name: string
   teacher: number
   teacher_name: string
+  room?: number | null
+  room_name?: string
   academic_year: string
   created_at: string
+}
+
+// Event & Notification Types
+export type EventAudience = 'global' | 'staff' | 'class'
+export type EventType = 'holiday' | 'meeting' | 'exam' | 'celebration' | 'other'
+
+export interface Event {
+  id: number
+  title: string
+  description: string
+  event_type: EventType
+  audience: EventAudience
+  target_class?: number
+  target_class_name?: string
+  target_section?: number
+  target_section_name?: string
+  start_datetime: string
+  end_datetime?: string
+  is_active: boolean
+  created_by: number
+  created_by_name: string
+  created_at: string
+}
+
+export interface NotificationSubscription {
+  id: number
+  endpoint: string
+  p256dh?: string
+  auth?: string
+  browser?: string
+  device_type?: string
 }

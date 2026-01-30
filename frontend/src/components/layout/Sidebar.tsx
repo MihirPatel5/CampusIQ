@@ -24,6 +24,9 @@ import {
   ChevronRight,
   X,
   Building2,
+  UserCheck,
+  Wallet,
+  BarChart3
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -55,15 +58,19 @@ export function Sidebar() {
         ] : []),
         { label: 'Classes', icon: Layers, path: '/classes' },
         { label: 'Subjects', icon: BookOpen, path: '/subjects' },
+        { label: 'Rooms', icon: Building2, path: '/academic/rooms' },
       ],
     },
     {
       title: 'Management',
       items: [
-        { label: 'Attendance', icon: ClipboardCheck, path: '/attendance' },
+        { label: 'Student Attendance', icon: ClipboardCheck, path: '/attendance' },
+        { label: 'Staff Attendance', icon: UserCheck, path: '/attendance/staff' },
         { label: 'Exams', icon: FileText, path: '/exams' },
+        { label: 'Consolidated Results', icon: BarChart3, path: '/exams/consolidated' },
         ...(['admin', 'super_admin'].includes(user?.role || '') ? [
-          { label: 'Fees', icon: CreditCard, path: '/fees' }
+          { label: 'Fee Management', icon: CreditCard, path: '/fees' },
+          { label: 'Fee Collection', icon: Wallet, path: '/fees/collect' }
         ] : []),
         { label: 'Timetable', icon: Calendar, path: '/timetable' },
       ],

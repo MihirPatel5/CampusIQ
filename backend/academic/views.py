@@ -2,8 +2,8 @@ from core.views import TenantMixin
 from rest_framework import viewsets, filters
 from rest_framework.permissions import IsAuthenticated
 from accounts.permissions import IsAdmin, IsAdminOrReadOnly
-from .models import Class, Section, Subject, SubjectAssignment, Period, TimetableEntry
-from .serializers import ClassSerializer, SectionSerializer, SubjectSerializer, SubjectAssignmentSerializer, PeriodSerializer, TimetableEntrySerializer
+from .models import Class, Section, Subject, SubjectAssignment, Period, TimetableEntry, ClassRoom
+from .serializers import ClassSerializer, SectionSerializer, SubjectSerializer, SubjectAssignmentSerializer, PeriodSerializer, TimetableEntrySerializer, ClassRoomSerializer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -240,6 +240,33 @@ class PeriodViewSet(TenantMixin, viewsets.ModelViewSet):
         serializer.save(updated_by=self.request.user)
 
 
+class ClassRoomViewSet(TenantMixin, viewsets.ModelViewSet):
+    """
+    ViewSet for ClassRoom management
+    """
+    queryset = ClassRoom.objects.all()
+    serializer_class = ClassRoomSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'location']
+    ordering_fields = ['name', 'created_at']
+    ordering = ['name']
+    
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdmin()]
+        return [IsAuthenticated()]
+    
+    def perform_create(self, serializer):
+        user = self.request.user
+        kwargs = {'created_by': user}
+        if user.school:
+            kwargs['school'] = user.school
+        serializer.save(**kwargs)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+
 class TimetableEntryViewSet(TenantMixin, viewsets.ModelViewSet):
     """
     ViewSet for Timetable management
@@ -286,6 +313,11 @@ class TimetableEntryViewSet(TenantMixin, viewsets.ModelViewSet):
         day = self.request.query_params.get('day')
         if day:
             queryset = queryset.filter(day_of_week=day)
+            
+        # Filter by room
+        room_id = self.request.query_params.get('room_id')
+        if room_id:
+            queryset = queryset.filter(room_id=room_id)
             
         return queryset
     

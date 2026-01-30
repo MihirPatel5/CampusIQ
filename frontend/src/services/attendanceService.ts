@@ -51,6 +51,16 @@ export const attendanceService = {
         const response = await api.get<AttendanceStats>(API_ENDPOINTS.ATTENDANCE_STATS)
         return response.data
     },
+
+    async markStaffAttendance(data: any) {
+        const response = await api.post(API_ENDPOINTS.STAFF_ATTENDANCE_MARK, data)
+        return response.data
+    },
+
+    async getStaffAttendance(params?: any) {
+        const response = await api.get(API_ENDPOINTS.STAFF_ATTENDANCE, { params })
+        return Array.isArray(response.data) ? response.data : (response.data.results || [])
+    },
 }
 
 export default attendanceService

@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { config } from '@/config'
 import { useAuthStore } from '@/stores/authStore'
+import { toast } from 'sonner'
 
 // Create axios instance
 export const api = axios.create({
@@ -25,43 +26,56 @@ api.interceptors.request.use(
   }
 )
 
-// Response interceptor - Handle token refresh
+// Response interceptor - Handle token refresh & Global Errors
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
-    
+
+    // Ignore 401 errors for global toast (handled by refresh/logout)
+    if (error.response?.status !== 401) {
+      // Network Error or Server Error
+      const message = getErrorMessage(error)
+      // Prevent duplicate/spammy toasts? For now, direct toast is fine.
+      toast.error(message)
+    }
+
     // If 401 and not already retrying
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-      
+
       const tokens = useAuthStore.getState().tokens
-      
+
       if (tokens?.refresh) {
         try {
           const response = await axios.post(
             `${config.apiBaseUrl}/auth/token/refresh/`,
             { refresh: tokens.refresh }
           )
-          
+
           const newTokens = {
             access: response.data.access,
             refresh: tokens.refresh,
           }
-          
+
           useAuthStore.getState().setTokens(newTokens)
           originalRequest.headers.Authorization = `Bearer ${newTokens.access}`
-          
+
           return api(originalRequest)
         } catch {
           // Refresh failed - logout user
           useAuthStore.getState().logout()
           window.location.href = '/login'
+          toast.error("Session expired. Please login again.")
           return Promise.reject(error)
         }
+      } else {
+        // No refresh token, just logout
+        useAuthStore.getState().logout()
+        window.location.href = '/login'
       }
     }
-    
+
     return Promise.reject(error)
   }
 )
@@ -70,21 +84,21 @@ api.interceptors.response.use(
 export function getErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<{ detail?: string; message?: string; error?: string }>
-    
+
     if (axiosError.response?.data) {
       const data = axiosError.response.data
       return data.detail || data.message || data.error || 'An error occurred'
     }
-    
+
     if (axiosError.message) {
       return axiosError.message
     }
   }
-  
+
   if (error instanceof Error) {
     return error.message
   }
-  
+
   return 'An unexpected error occurred'
 }
 

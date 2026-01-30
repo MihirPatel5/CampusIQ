@@ -18,6 +18,7 @@ export default function ClassTimetableManagerPage() {
     const [periods, setPeriods] = useState<Period[]>([])
     const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([])
     const [assignments, setAssignments] = useState<SubjectAssignment[]>([])
+    const [rooms, setRooms] = useState<any[]>([])
 
     // Selection State
     const [selectedClassId, setSelectedClassId] = useState<string>('')
@@ -28,6 +29,7 @@ export default function ClassTimetableManagerPage() {
     const [selectedSlot, setSelectedSlot] = useState<{ day: number, period: Period } | null>(null)
     const [selectedEntry, setSelectedEntry] = useState<TimetableEntry | undefined>(undefined)
     const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>('')
+    const [selectedRoomId, setSelectedRoomId] = useState<string>('')
 
     // Load initial data (Classes and Periods)
     useEffect(() => {
@@ -54,12 +56,14 @@ export default function ClassTimetableManagerPage() {
     const fetchInitialData = async () => {
         try {
             setLoading(true)
-            const [classesData, periodsData] = await Promise.all([
+            const [classesData, periodsData, roomsData] = await Promise.all([
                 academicService.getClasses(),
-                timetableService.getPeriods()
+                timetableService.getPeriods(),
+                academicService.getClassRooms()
             ])
             setClasses(classesData)
             setPeriods(periodsData)
+            setRooms(roomsData)
         } catch (error) {
             toast.error('Failed to load initial data')
         } finally {
@@ -111,8 +115,11 @@ export default function ClassTimetableManagerPage() {
             // Find assignment that matches subject
             const assignment = assignments.find(a => a.subject === entry.subject)
             if (assignment) setSelectedAssignmentId(assignment.id.toString())
+            if (entry.room) setSelectedRoomId(entry.room.toString())
+            else setSelectedRoomId('')
         } else {
             setSelectedAssignmentId('')
+            setSelectedRoomId('')
         }
 
         setIsDialogOpen(true)
@@ -132,6 +139,7 @@ export default function ClassTimetableManagerPage() {
                 period: selectedSlot.period.id,
                 subject: assignment.subject,
                 teacher: assignment.teacher,
+                room: selectedRoomId ? parseInt(selectedRoomId) : null,
                 academic_year: '2024-25' // TODO: Get from class or context
             }
 
@@ -262,6 +270,23 @@ export default function ClassTimetableManagerPage() {
                             <p className="text-xs text-muted-foreground">
                                 Showing subjects assigned to this section.
                             </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Classroom / Lab (Optional)</Label>
+                            <Select value={selectedRoomId} onValueChange={setSelectedRoomId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select Room" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">No Room Assigned</SelectItem>
+                                    {rooms.map(r => (
+                                        <SelectItem key={r.id} value={r.id.toString()}>
+                                            {r.name} ({r.location})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         <div className="flex gap-2 justify-end mt-4">
